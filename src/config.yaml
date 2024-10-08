@@ -1,0 +1,8 @@
+path:
+  model_path: model/trained_model/
+  train_path: ../data/train_dataset/
+  test_path: ../data/test_dataset/
+  output_path: output/
+
+model:
+  model_name: klue/bert-base

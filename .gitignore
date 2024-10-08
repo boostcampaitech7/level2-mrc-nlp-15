@@ -1,3 +1,6 @@
 # dataset
 data
-basecode
+code/*
+src/model/*
+src/output/*
+src/wandb/*
