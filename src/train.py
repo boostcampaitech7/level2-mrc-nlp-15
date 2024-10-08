@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 os.path.abspath(os.path.dirname(__file__))
 
 
-def main():
+def main(args=None):
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
 
@@ -54,10 +54,12 @@ def main():
         (ModelArguments, DataTrainingArguments, TrainingArguments)
     )
 
-    if len(sys.argv) > 1:
+    if args is None:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
     else:
-        # make sys.argv
+        model_output_dir = args['model_path']
+
         sys.argv.append('--output_dir')
         sys.argv.append(model_output_dir)
         sys.argv.append('--do_train')

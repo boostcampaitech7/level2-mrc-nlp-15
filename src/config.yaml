@@ -1,5 +1,5 @@
 path:
-  model_path: model/trained_model/
+  model_path: model/
   train_path: ../data/train_dataset/
   test_path: ../data/test_dataset/
   output_path: output/
