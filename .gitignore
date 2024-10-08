@@ -1,2 +1,6 @@
 # dataset
 data
+code/*
+src/model/*
+src/output/*
+src/wandb/*
