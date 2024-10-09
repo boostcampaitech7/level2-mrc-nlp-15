@@ -30,16 +30,27 @@ random.seed(seed) # python random seed 고정
 np.random.seed(seed) # numpy random seed 고정
 torch.manual_seed(seed) # torch random seed 고정
 torch.cuda.manual_seed_all(seed)
-if deterministic: # cudnn random seed 고정 - 고정 시 학습 속도가 느려질 수 있습니다. 
-	torch.backends.cudnn.deterministic = True
-	torch.backends.cudnn.benchmark = False
+if deterministic: # cudnn random seed 고정 - 고정 시 학습 속도가 느려질 수 있습니다.
+    # torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 logger = logging.getLogger(__name__)
 os.path.abspath(os.path.dirname(__file__))
 
+def get_latest_model_dir(model_dir, model_name):
+    model_name = model_name.replace('/', '-')
 
-def main(args=None):
+    # search for latest model dir, dir naming is model_name + _time
+    model_dirs = [d for d in os.listdir(model_dir) if os.path.isdir(os.path.join(model_dir, d)) and model_name in d]
+
+    if len(model_dirs) == 0:
+        return None
+
+    model_dirs.sort(reverse=True)
+    return os.path.join(model_dir, model_dirs[0])
+
+def main(args=None, do_eval=False):
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
 
@@ -60,10 +71,15 @@ def main(args=None):
     else:
         model_output_dir = args['model_path']
 
+        sys.argv = sys.argv[:1]
         sys.argv.append('--output_dir')
         sys.argv.append(model_output_dir)
-        sys.argv.append('--do_train')
+        sys.argv.append('--do_eval') if do_eval else sys.argv.append('--do_train')
+
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+        if do_eval:
+            model_args.model_name_or_path = model_output_dir
 
     # [참고] argument를 manual하게 수정하고 싶은 경우에 아래와 같은 방식을 사용할 수 있습니다
     # training_args.per_device_train_batch_size = 4

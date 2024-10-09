@@ -5,4 +5,6 @@ path:
   output_path: output/
 
 model:
-  model_name: klue/bert-base
+  #model_name: klue/bert-base
+  #model_name: timpal0l/mdeberta-v3-base-squad2
+  model_name: FacebookAI/roberta-large

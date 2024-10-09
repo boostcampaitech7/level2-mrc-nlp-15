@@ -39,14 +39,10 @@ from utils_qa import check_no_error, postprocess_qa_predictions
 logger = logging.getLogger(__name__)
 os.path.abspath(os.path.dirname(__file__))
 
+
 def main(args=None):
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
-
-    # read config yaml and get output dir
-    with open('config.yaml', 'r') as f:
-        config = yaml.safe_load(f)
-
     parser = HfArgumentParser(
         (ModelArguments, DataTrainingArguments, TrainingArguments)
     )
@@ -58,6 +54,8 @@ def main(args=None):
         model_output_dir = args['model_path']
         test_output_dir = args['output_path']
         test_dataset = args['test_path']
+
+        sys.argv = sys.argv[:1]
 
         sys.argv.append('--output_dir')
         sys.argv.append(test_output_dir)

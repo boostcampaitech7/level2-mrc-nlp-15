@@ -155,11 +155,8 @@ def postprocess_qa_predictions(
                 }
 
             # `n_best_size`보다 큰 start and end logits을 살펴봅니다.
-            start_indexes = np.argsort(start_logits)[
-                -1 : -n_best_size - 1 : -1
-            ].tolist()
-
-            end_indexes = np.argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
+            start_indexes = np.argsort(start_logits)[-1:-n_best_size-1:-1].tolist()
+            end_indexes = np.argsort(end_logits)[-1:-n_best_size-1:-1].tolist()
 
             for start_index in start_indexes:
                 for end_index in end_indexes:
