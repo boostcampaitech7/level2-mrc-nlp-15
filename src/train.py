@@ -4,7 +4,9 @@ import sys
 import random
 import numpy as np
 import torch
+import transformers
 import yaml
+import augmentation
 from typing import NoReturn
 
 from arguments import DataTrainingArguments, ModelArguments
@@ -19,6 +21,7 @@ from transformers import (
     HfArgumentParser,
     TrainingArguments,
     set_seed,
+    Trainer
 )
 from utils_qa import check_no_error, postprocess_qa_predictions
 
@@ -81,9 +84,12 @@ def main(args=None, do_eval=False):
         if do_eval:
             model_args.model_name_or_path = model_output_dir
 
+
     # [참고] argument를 manual하게 수정하고 싶은 경우에 아래와 같은 방식을 사용할 수 있습니다
     # training_args.per_device_train_batch_size = 4
     # print(training_args.per_device_train_batch_size)
+    training_args.save_steps = config['hyperparameters']['save_steps']
+    model_args.augmentation_list = config['augmentation']['active']
 
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {data_args.dataset_name}")
@@ -181,6 +187,8 @@ def run_mrc(
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
             # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False if isinstance(model, transformers.RobertaPreTrainedModel) else True,
+
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -251,6 +259,9 @@ def run_mrc(
             raise ValueError("--do_train requires a train dataset")
         train_dataset = datasets["train"]
 
+        # 데이터 전처리 및 증강 여기서 하면 됨
+        train_dataset = augmentation.augmentation(train_dataset, model_args.augmentation_list)
+
         # dataset에서 train feature를 생성합니다.
         train_dataset = train_dataset.map(
             prepare_train_features,
@@ -273,6 +284,7 @@ def run_mrc(
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
             # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False if isinstance(model, transformers.RobertaPreTrainedModel) else True,
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -299,17 +311,16 @@ def run_mrc(
             ]
         return tokenized_examples
 
-    if training_args.do_eval:
-        eval_dataset = datasets["validation"]
+    eval_dataset = datasets["validation"]
 
-        # Validation Feature 생성
-        eval_dataset = eval_dataset.map(
-            prepare_validation_features,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-        )
+    # Validation Feature 생성
+    eval_dataset = eval_dataset.map(
+        prepare_validation_features,
+        batched=True,
+        num_proc=data_args.preprocessing_num_workers,
+        remove_columns=column_names,
+        load_from_cache_file=not data_args.overwrite_cache,
+    )
 
     # Data collator
     # flag가 True이면 이미 max length로 padding된 상태입니다.
@@ -345,11 +356,9 @@ def run_mrc(
             )
 
     metric = load_metric("squad")
-
     def compute_metrics(p: EvalPrediction):
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
-    # Trainer 초기화
     trainer = QuestionAnsweringTrainer(
         model=model,
         args=training_args,
@@ -361,7 +370,6 @@ def run_mrc(
         post_process_function=post_processing_function,
         compute_metrics=compute_metrics,
     )
-    
     
     # Training
     if training_args.do_train:

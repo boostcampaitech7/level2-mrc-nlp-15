@@ -5,6 +5,15 @@ path:
   output_path: output/
 
 model:
-  #model_name: klue/bert-base
+  model_name: klue/bert-base
+  #model_name: klue/roberta-large
   #model_name: timpal0l/mdeberta-v3-base-squad2
-  model_name: FacebookAI/roberta-large
+
+hyperparameters:
+  save_steps : 1500
+  metric_for_best_model : eval_f1
+
+augmentation:
+  active : ["synonym_replacement", "random_insertion", "random_deletion", "random_swap"]
+  inactive : []
+

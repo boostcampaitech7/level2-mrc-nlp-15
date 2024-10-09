@@ -37,6 +37,12 @@ class ModelArguments:
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
     )
+    augmentation_list: Optional[list[str]] = field(
+        default=None,
+        metadata={
+            "help": "List of augmentation methods to apply to training dataset"
+        },
+    )
 
 
 @dataclass

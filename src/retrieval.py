@@ -17,8 +17,6 @@ seed = 2024
 random.seed(seed) # python random seed 고정
 np.random.seed(seed) # numpy random seed 고정
 
-
-
 @contextmanager
 def timer(name):
     t0 = time.time()
