@@ -5,7 +5,8 @@ path:
   output_path: output/
 
 model:
-  model_name: klue/bert-base
+  model_name: uomnf97/klue-roberta-finetuned-korquad-v2
+  #model_name: klue/bert-base
   #model_name: klue/roberta-large
   #model_name: timpal0l/mdeberta-v3-base-squad2
 
@@ -16,4 +17,3 @@ hyperparameters:
 augmentation:
   active : ["synonym_replacement", "random_insertion", "random_deletion", "random_swap"]
   inactive : []
-

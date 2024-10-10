@@ -9,6 +9,7 @@ import logging
 import os
 import sys
 import transformers
+from retrieval_BM25 import BM25SparseRetrieval
 from typing import Callable, Dict, List, NoReturn, Tuple
 
 import numpy as np
@@ -107,15 +108,19 @@ def main(args=None):
         config=config,
     )
 
-    # True일 경우 : run passage retrieval
-    if data_args.eval_retrieval:
+    # run passage retrieval
+    # if data_args.eval_retrieval:
+    #     datasets = run_sparse_retrieval(
+    #         tokenizer.tokenize, datasets, training_args, data_args,
+    #     )
+
+    if training_args.do_predict and data_args.eval_retrieval:
         datasets = run_sparse_retrieval(
             tokenizer.tokenize, datasets, training_args, data_args,
         )
 
     # eval or predict mrc model
-    if training_args.do_eval or training_args.do_predict:
-        run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
+    run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
 def run_sparse_retrieval(
@@ -128,8 +133,15 @@ def run_sparse_retrieval(
 ) -> DatasetDict:
 
     # Query에 맞는 Passage들을 Retrieval 합니다.
-    retriever = SparseRetrieval(
-        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
+    # retriever = SparseRetrieval(
+    #     tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
+    # )
+
+    retriever = BM25SparseRetrieval(
+        tokenize_fn=tokenize_fn,
+        args=data_args,
+        data_path=data_path,
+        context_path=context_path
     )
     retriever.get_sparse_embedding()
 

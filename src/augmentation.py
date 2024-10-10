@@ -3,27 +3,27 @@ def synonym_augmentation(train_dataset):
 
 
 def co_shift_augmentation(train_dataset):
-    pass
+    return train_dataset
 
 
 def synonym_replacement(train_dataset):
-    pass
+    return train_dataset
 
 
 def random_insertion(train_dataset):
-    pass
+    return train_dataset
 
 
 def random_deletion(train_dataset):
-    pass
+    return train_dataset
 
 
 def random_swap(train_dataset):
-    pass
+    return train_dataset
 
 
 def shift_augmentation(train_dataset):
-    pass
+    return train_dataset
 
 
 def augmentation(train_dataset, aug_list):

@@ -83,6 +83,10 @@ class DataTrainingArguments:
             "help": "When splitting up a long document into chunks, how much stride to take between chunks."
         },
     )
+    eval_retrieval: bool = field(
+        default=True,
+        metadata={"help": "Whether to run passage retrieval using sparse embedding."},
+    )
     max_answer_length: int = field(
         default=30,
         metadata={
