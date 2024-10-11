@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import sys
@@ -31,8 +32,11 @@ from transformers import (
     TrainingArguments,
 )
 from utils import set_seed, check_no_error, postprocess_qa_predictions
+import wandb
 
 logger = logging.getLogger(__name__)
+wandb.init(project="odqa",
+           name="run_" + (datetime.datetime.now() + datetime.timedelta(hours=9)).strftime("%Y%m%d_%H%M%S"))
 
 def main(args=None, do_train=False, do_eval=False, do_predict=False):
     # read config yaml and get output dir
@@ -225,7 +229,7 @@ def run_sparse_retrieval(
     data_path: str = "../data",
     context_path: str = "wikipedia_documents.json",
 ) -> DatasetDict:
-
+  
     if data_args.retrieval_type == "bm25":
         retriever = BM25SparseRetrieval(
             tokenize_fn=tokenize_fn,
@@ -240,16 +244,16 @@ def run_sparse_retrieval(
             data_path=data_path,
             context_path=context_path
         )
-
+        
     retriever.get_sparse_embedding()
 
-    if data_args.use_faiss:
-        retriever.build_faiss(num_clusters=data_args.num_clusters)
-        df = retriever.retrieve_faiss(
-            datasets["validation"], topk=data_args.top_k_retrieval
-        )
-    else:
-        df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval)
+    # if data_args.use_faiss:
+    #     retriever.build_faiss(num_clusters=data_args.num_clusters)
+    #     df = retriever.retrieve_faiss(
+    #         datasets["validation"], topk=data_args.top_k_retrieval
+    #     )
+    # else:
+    df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval)
 
     if training_args.do_predict:
         f = Features(
@@ -406,7 +410,7 @@ def run_mrc(
         else:
             checkpoint = None
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+        trainer.save_model()
 
         metrics = train_result.metrics
         metrics["train_samples"] = len(train_dataset)

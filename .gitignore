@@ -8,7 +8,7 @@ data
 # outputs
 models
 output
-code/*
+code
 
 # src
 src/model
@@ -17,3 +17,7 @@ src/wandb/*
 src/test
 src/TBD
 src/__pycache__
+
+# wandb
+src/wandb
+wandb

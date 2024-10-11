@@ -28,6 +28,7 @@ class BM25SparseRetrieval:
             data_path: Optional[str] = "../data/",
             context_path: Optional[str] = "wikipedia_documents.json",
     ) -> None:
+      
         """Arguments:
             tokenize_fn:
                 기본 text를 tokenize해주는 함수입니다.
@@ -128,7 +129,7 @@ class BM25SparseRetrieval:
             sorted_result = np.argsort(scores)[-k:][::-1]
             doc_scores.append(scores[sorted_result])
             doc_indices.append(sorted_result.tolist())
-
+            
         return doc_scores, doc_indices
 
     def get_relevant_doc_bulk(
@@ -156,13 +157,14 @@ class BM25SparseRetrieval:
 
 if __name__ == "__main__":
     import argparse
-
+  
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--dataset_name", metavar="./data/train_dataset", type=str, help="")
     parser.add_argument("--model_name_or_path", metavar="bert-base-multilingual-cased", type=str, help="")
     parser.add_argument("--data_path", metavar="./data", type=str, help="")
     parser.add_argument("--context_path", metavar="wikipedia_documents.json", type=str, help="")
     parser.add_argument("--retrieval_method", metavar="bm25", type=str, help="")
+
 
     args = parser.parse_args()
 

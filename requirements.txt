@@ -5,3 +5,6 @@ transformers
 faiss-gpu
 pandas
 numpy
+
+wandb
+rank_bm25
