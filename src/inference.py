@@ -9,7 +9,7 @@ import logging
 import os
 import sys
 import transformers
-from retrieval_BM25 import BM25SparseRetrieval
+from retrieval_BM25 import BM25SparseRetrieval_H, BM25SparseRetrieval_S
 from typing import Callable, Dict, List, NoReturn, Tuple
 
 import numpy as np
@@ -137,7 +137,7 @@ def run_sparse_retrieval(
     #     tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
     # )
 
-    retriever = BM25SparseRetrieval(
+    retriever = BM25SparseRetrieval_S(
         tokenize_fn=tokenize_fn,
         args=data_args,
         data_path=data_path,
