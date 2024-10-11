@@ -118,7 +118,7 @@ def main(args=None, do_train=False, do_eval=False, do_predict=False):
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
     )
-    model_args.instance_of_bert = isinstance(model, transformers.RobertaPreTrainedModel)
+    model_args.instance_of_bert = isinstance(model, transformers.BertPreTrainedModel)
 
     if do_predict:
         datasets = run_sparse_retrieval(

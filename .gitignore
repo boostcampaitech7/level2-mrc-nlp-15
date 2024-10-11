@@ -1,6 +1,6 @@
 # python
 __pycache__
-
+*.pyc
 
 # dataset
 data
@@ -13,7 +13,6 @@ code
 # src
 src/model
 src/output
-src/wandb/*
 src/test
 src/TBD
 src/__pycache__
