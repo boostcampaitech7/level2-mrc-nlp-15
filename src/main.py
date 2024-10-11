@@ -1,7 +1,11 @@
 import logging
 import os
 import sys
+
+import transformers
+import yaml
 import numpy as np
+import augmentation
 from typing import Callable, List, NoReturn, Tuple
 
 from arguments import DataTrainingArguments, ModelArguments
@@ -16,6 +20,7 @@ from datasets import (
 )
 from qa_trainer import QATrainer
 from retriever import SparseRetrieval
+from retrieval_BM25 import BM25SparseRetrieval
 from transformers import (
     AutoConfig,
     AutoModelForQuestionAnswering,
@@ -29,11 +34,52 @@ from utils import set_seed, check_no_error, postprocess_qa_predictions
 
 logger = logging.getLogger(__name__)
 
-def main():
+def main(args=None, do_train=False, do_eval=False, do_predict=False):
+    # read config yaml and get output dir
+    with open('config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
     parser = HfArgumentParser(
         (ModelArguments, DataTrainingArguments, TrainingArguments)
     )
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    if args is None:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    else:
+        model_output_dir = args['model_path']
+        test_output_dir = args['output_path']
+        test_dataset = args['test_path']
+
+        sys.argv = sys.argv[:1]
+
+        if not do_predict:
+            sys.argv.append('--output_dir')
+            sys.argv.append(model_output_dir)
+
+            sys.argv.append('--do_train') if do_train else sys.argv.append('--do_eval')
+
+        else:
+            sys.argv.append('--output_dir')
+            sys.argv.append(test_output_dir)
+            sys.argv.append('--dataset_name')
+            sys.argv.append(test_dataset)
+            sys.argv.append('--model_name_or_path')
+            sys.argv.append(model_output_dir)
+            sys.argv.append('--overwrite_output_dir')
+            sys.argv.append('--do_predict')
+
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    # [참고] argument를 manual하게 수정하고 싶은 경우에 아래와 같은 방식을 사용할 수 있습니다
+    # training_args.per_device_train_batch_size = 4
+    # print(training_args.per_device_train_batch_size)
+    training_args.do_train = do_train
+    training_args.do_eval = do_eval
+    training_args.do_predict = do_predict
+
+    training_args.save_steps = config['hyperparameters']['save_steps']
+    model_args.augmentation_list = config['augmentation']['active']
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -    %(message)s",
@@ -56,6 +102,7 @@ def main():
         if model_args.config_name is not None
         else model_args.model_name_or_path,
     )
+
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name is not None
@@ -67,8 +114,9 @@ def main():
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
     )
+    model_args.instance_of_bert = isinstance(model, transformers.RobertaPreTrainedModel)
 
-    if training_args.do_predict and data_args.eval_retrieval:
+    if do_predict:
         datasets = run_sparse_retrieval(
             tokenizer.tokenize, datasets, training_args, data_args,
         )
@@ -76,7 +124,7 @@ def main():
     run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
-def prepare_train_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, data_args, answer_column_name):
+def prepare_train_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, model_args, data_args, answer_column_name):
     tokenized_examples = tokenizer(
         examples[question_column_name if pad_on_right else context_column_name],
         examples[context_column_name if pad_on_right else question_column_name],
@@ -85,7 +133,7 @@ def prepare_train_features(examples, tokenizer, question_column_name, pad_on_rig
         stride=data_args.doc_stride,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
-        return_token_type_ids=False, # True if bert, False if roberta
+        return_token_type_ids=model_args.instance_of_bert, # True if bert, False if roberta
         padding="max_length" if data_args.pad_to_max_length else False,
     )
 
@@ -139,6 +187,36 @@ def prepare_train_features(examples, tokenizer, question_column_name, pad_on_rig
     return tokenized_examples
 
 
+def prepare_validation_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, model_args, data_args, answer_column_name):
+    tokenized_examples = tokenizer(
+        examples[question_column_name if pad_on_right else context_column_name],
+        examples[context_column_name if pad_on_right else question_column_name],
+        truncation="only_second" if pad_on_right else "only_first",
+        max_length=max_seq_length,
+        stride=data_args.doc_stride,
+        return_overflowing_tokens=True,
+        return_offsets_mapping=True,
+        return_token_type_ids=model_args.instance_of_bert, # True if bert, False if roberta
+        padding="max_length" if data_args.pad_to_max_length else False,
+    )
+
+    sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
+
+    tokenized_examples["example_id"] = []
+
+    for i in range(len(tokenized_examples["input_ids"])):
+        sequence_ids = tokenized_examples.sequence_ids(i)
+        context_index = 1 if pad_on_right else 0
+
+        sample_index = sample_mapping[i]
+        tokenized_examples["example_id"].append(examples["id"][sample_index])
+
+        tokenized_examples["offset_mapping"][i] = [
+            (o if sequence_ids[k] == context_index else None)
+            for k, o in enumerate(tokenized_examples["offset_mapping"][i])
+        ]
+    return tokenized_examples
+
 def run_sparse_retrieval(
     tokenize_fn: Callable[[str], List[str]],
     datasets: DatasetDict,
@@ -147,9 +225,22 @@ def run_sparse_retrieval(
     data_path: str = "../data",
     context_path: str = "wikipedia_documents.json",
 ) -> DatasetDict:
-    retriever = SparseRetrieval(
-        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
-    )
+
+    if data_args.retrieval_type == "bm25":
+        retriever = BM25SparseRetrieval(
+            tokenize_fn=tokenize_fn,
+            args=data_args,
+            data_path=data_path,
+            context_path=context_path
+        )
+
+    else:
+        retriever = SparseRetrieval(
+            tokenize_fn=tokenize_fn,
+            data_path=data_path,
+            context_path=context_path
+        )
+
     retriever.get_sparse_embedding()
 
     if data_args.use_faiss:
@@ -189,37 +280,6 @@ def run_sparse_retrieval(
     return datasets
 
 
-def prepare_validation_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, data_args, answer_column_name):
-    tokenized_examples = tokenizer(
-        examples[question_column_name if pad_on_right else context_column_name],
-        examples[context_column_name if pad_on_right else question_column_name],
-        truncation="only_second" if pad_on_right else "only_first",
-        max_length=max_seq_length,
-        stride=data_args.doc_stride,
-        return_overflowing_tokens=True,
-        return_offsets_mapping=True,
-        return_token_type_ids=False, # True if bert, False if roberta
-        padding="max_length" if data_args.pad_to_max_length else False,
-    )
-
-    sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
-
-    tokenized_examples["example_id"] = []
-
-    for i in range(len(tokenized_examples["input_ids"])):
-        sequence_ids = tokenized_examples.sequence_ids(i)
-        context_index = 1 if pad_on_right else 0
-
-        sample_index = sample_mapping[i]
-        tokenized_examples["example_id"].append(examples["id"][sample_index])
-
-        tokenized_examples["offset_mapping"][i] = [
-            (o if sequence_ids[k] == context_index else None)
-            for k, o in enumerate(tokenized_examples["offset_mapping"][i])
-        ]
-    return tokenized_examples
-
-
 def run_mrc(
     data_args: DataTrainingArguments,
     training_args: TrainingArguments,
@@ -230,6 +290,7 @@ def run_mrc(
 ) -> NoReturn:
     if training_args.do_train:
         column_names = datasets["train"].column_names
+
     else:
         column_names = datasets["validation"].column_names
 
@@ -246,7 +307,11 @@ def run_mrc(
     if training_args.do_train:
         if "train" not in datasets:
             raise ValueError("--do_train requires a train dataset")
-        train_dataset = datasets["train"]
+
+        debug_split = None
+        #debug_split = np.random.choice(len(datasets["train"]), 100)
+        train_dataset = datasets["train"].select(debug_split) if debug_split is not None else datasets["train"]
+        train_dataset = augmentation.augmentation(train_dataset, model_args.augmentation_list)
 
         train_dataset = train_dataset.map(
             prepare_train_features,
@@ -254,6 +319,7 @@ def run_mrc(
                 'tokenizer': tokenizer,
                 'pad_on_right': pad_on_right,
                 'max_seq_length': max_seq_length,
+                'model_args': model_args,
                 'data_args': data_args,
                 'question_column_name': question_column_name,
                 'context_column_name': context_column_name,
@@ -274,6 +340,7 @@ def run_mrc(
                 'tokenizer': tokenizer,
                 'pad_on_right': pad_on_right,
                 'max_seq_length': max_seq_length,
+                'model_args': model_args,
                 'data_args': data_args,
                 'question_column_name': question_column_name,
                 'context_column_name': context_column_name,

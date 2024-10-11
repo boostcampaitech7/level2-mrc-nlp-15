@@ -1,9 +1,10 @@
 import os
-
-import train
-import inference
 import yaml
 import time
+
+import main
+
+os.path.join(os.path.dirname(__file__), 'config.yaml')
 
 if __name__ == '__main__':
     # read config yaml and get output dir
@@ -12,12 +13,13 @@ if __name__ == '__main__':
 
     # set output_dir as --output_dir in parser
     model_name = config['model']['model_name'].replace('/', '-')
-    model_dir = config['path']['model_path']
-    output_dir = config['path']['output_path']
-    test_dataset = config['path']['test_path']
 
-    model_output_dir = model_dir + model_name + time.strftime("_%Y%m%d_%H%M%S", time.localtime())
-    test_output_dir = output_dir + model_name + time.strftime("_%Y%m%d_%H%M%S", time.localtime())
+    model_dir = os.path.abspath(config['path']['model_path'])
+    output_dir = os.path.abspath(config['path']['output_path'])
+    test_dataset = os.path.abspath(config['path']['test_path'])
+
+    model_output_dir = os.path.join(model_dir, model_name + time.strftime("_%Y%m%d_%H%M%S", time.localtime()))
+    test_output_dir = os.path.join(output_dir, model_name + time.strftime("_%Y%m%d_%H%M%S", time.localtime()))
 
     args = {
         'model_path': model_output_dir,
@@ -31,7 +33,7 @@ if __name__ == '__main__':
     if not model_dirs:
         print('No model found in model path. Training new model name : ', model_name)
         os.makedirs(model_output_dir, exist_ok=True)
-        train.main(args)
+        main.main(args, do_train=True)
 
     else:
         # Ask user to train still
@@ -43,11 +45,11 @@ if __name__ == '__main__':
 
         if answer == 'y':
             os.makedirs(model_output_dir, exist_ok=True)
-            train.main(args)
+            main.main(args, do_train=True)
 
         else:
             args['model_path'] = os.path.join(model_dir, model_dirs[0])
             args['output_path'] = os.path.join(output_dir, model_dirs[0])
 
-    train.main(args, do_eval=True)
-    inference.main(args)
+    main.main(args, do_eval=True)
+    main.main(args, do_predict=True)

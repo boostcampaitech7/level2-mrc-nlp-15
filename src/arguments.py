@@ -19,17 +19,22 @@ class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
-
+    config_name: Optional[str] = field(
+        default=model_name,
+        metadata={
+            "help": "Pretrained config name or path if not the same as model_name"
+        },
+    )
+    tokenizer_name: Optional[str] = field(
+        default=model_name,
+        metadata={
+            "help": "Pretrained tokenizer name or path if not the same as model_name"
+        },
+    )
     model_name_or_path: str = field(
         default=model_name,
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
-        },
-    )
-    config_name: Optional[str] = field(
-        default="klue/roberta-large",
-        metadata={
-            "help": "Pretrained config name or path if not the same as model_name"
         },
     )
     config_name_dpr: Optional[str] = field(
@@ -38,17 +43,17 @@ class ModelArguments:
             "help": "Pretrained config name or path if not the same as model_name"
         },
     )
-    tokenizer_name: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "Pretrained tokenizer name or path if not the same as model_name"
-        },
-    )
     augmentation_list: Optional[list[str]] = field(
         default=None,
         metadata={
             "help": "List of augmentation methods to apply to training dataset"
         },
+    )
+    instance_of_bert : Optional[bool] = field(
+        default=None,
+        metadata={
+            "help": "Whether to use bert model"
+        }
     )
     #################################################################################
     batch_size: int = field(
@@ -57,7 +62,6 @@ class ModelArguments:
     num_epochs: int = field(
         default=3
     )
-
     #################################################################################
 
 
@@ -121,7 +125,7 @@ class DataTrainingArguments:
         },
     )
     use_faiss: bool = field(
-        default=True, metadata={"help": "Whether to build with faiss"}
+        default=False, metadata={"help": "Whether to build with faiss"}
     )
     # save_total_limit: int = field(
     #     default = 1,
@@ -133,4 +137,8 @@ class DataTrainingArguments:
 
     remove_char: bool = field(
         default=True, metadata={"help": "Whether to remove special character before embedding"}
+    )
+    retrieval_type : Optional[str] = field(
+        default=config['retrieval']['name'],
+        metadata={"help": "Define retrieval type"}
     )
