@@ -1,9 +1,18 @@
 # python
 __pycache__
 
+
 # dataset
 data
 
 # outputs
 models
 output
+code/*
+
+# src
+src/model
+src/output
+src/wandb/*
+src/test
+src/__pycache__

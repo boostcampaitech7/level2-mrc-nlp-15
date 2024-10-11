@@ -1,6 +1,18 @@
+import yaml
 from dataclasses import dataclass, field
 from typing import Optional
 
+# read config yaml and get output dir
+with open('config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+# set output_dir as --output_dir in parser
+model_output_dir = config['path']['model_path']
+test_output_dir = config['path']['output_path']
+train_dataset = config['path']['train_path']
+test_dataset = config['path']['test_path']
+
+model_name = config['model']['model_name']
 
 @dataclass
 class ModelArguments:
@@ -9,7 +21,7 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        default="klue/roberta-large",
+        default=model_name,
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
@@ -32,11 +44,16 @@ class ModelArguments:
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
     )
+    augmentation_list: Optional[list[str]] = field(
+        default=None,
+        metadata={
+            "help": "List of augmentation methods to apply to training dataset"
+        },
+    )
     #################################################################################
     batch_size: int = field(
         default=16
     )
-    
     num_epochs: int = field(
         default=3
     )
@@ -51,7 +68,7 @@ class DataTrainingArguments:
     """
 
     dataset_name: Optional[str] = field(
-        default="../data/train_dataset",
+        default=train_dataset,
         metadata={"help": "The name of the dataset to use."},
     )
     overwrite_cache: bool = field(
@@ -113,7 +130,7 @@ class DataTrainingArguments:
     dense_encoder_type: str = field(
         default = 'hybrid', metadata = {"help": "Whether to run passage retrieval using dense embedding."}
     )
-    
+
     remove_char: bool = field(
         default=True, metadata={"help": "Whether to remove special character before embedding"}
     )

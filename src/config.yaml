@@ -1,0 +1,19 @@
+path:
+  model_path: ../model/
+  train_path: ../data/train_dataset/
+  test_path: ../data/test_dataset/
+  output_path: ../output/
+
+model:
+  model_name: uomnf97/klue-roberta-finetuned-korquad-v2
+  #model_name: klue/bert-base
+  #model_name: klue/roberta-large
+  #model_name: timpal0l/mdeberta-v3-base-squad2
+
+hyperparameters:
+  save_steps : 1500
+  metric_for_best_model : eval_f1
+
+augmentation:
+  active : ["synonym_replacement", "random_insertion", "random_deletion", "random_swap"]
+  inactive : []
