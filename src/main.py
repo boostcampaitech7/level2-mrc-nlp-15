@@ -314,7 +314,7 @@ def run_mrc(
 
         debug_split = None
         #debug_split = np.random.choice(len(datasets["train"]), 100)
-        train_dataset = datasets["train"].select(debug_split) if debug_split is not None else datasets["train"]
+        train_dataset = datasets["train"]
         train_dataset = augmentation.augmentation(train_dataset, model_args.augmentation_list)
 
         train_dataset = train_dataset.map(
@@ -390,6 +390,12 @@ def run_mrc(
                 predictions=formatted_predictions, label_ids=references
             )
 
+    training_args.learning_rate = 1e-5
+    training_args.num_train_epochs = 3
+    training_args.per_device_train_batch_size = 16
+    training_args.per_device_eval_batch_size = 16
+    training_args.lr_scheduler_type = 'constant'
+
     trainer = QATrainer(
         model=model,
         args=training_args,
@@ -401,12 +407,6 @@ def run_mrc(
         post_process_function=post_processing_function,
         compute_metrics=lambda x: metric.compute(predictions=x.predictions, references=x.label_ids),
     )
-
-    training_args.learning_rate = 1e-5
-    training_args.num_train_epochs = 3
-    training_args.per_device_train_batch_size = 16
-    training_args.per_device_eval_batch_size = 16
-    training_args.lr_scheduler_type = 'constant'
 
     if training_args.do_train:
         if last_checkpoint is not None:
