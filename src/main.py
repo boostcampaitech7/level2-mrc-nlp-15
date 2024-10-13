@@ -402,6 +402,12 @@ def run_mrc(
         compute_metrics=lambda x: metric.compute(predictions=x.predictions, references=x.label_ids),
     )
 
+    training_args.learning_rate = 1e-5
+    training_args.num_train_epochs = 3
+    training_args.per_device_train_batch_size = 16
+    training_args.per_device_eval_batch_size = 16
+    training_args.lr_scheduler_type = 'constant'
+
     if training_args.do_train:
         if last_checkpoint is not None:
             checkpoint = last_checkpoint
