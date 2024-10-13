@@ -57,13 +57,7 @@ def main(args=None, do_train=False, do_eval=False, do_predict=False):
 
         sys.argv = sys.argv[:1]
 
-        if not do_predict:
-            sys.argv.append('--output_dir')
-            sys.argv.append(model_output_dir)
-
-            sys.argv.append('--do_train') if do_train else sys.argv.append('--do_eval')
-
-        else:
+        if do_predict:
             sys.argv.append('--output_dir')
             sys.argv.append(test_output_dir)
             sys.argv.append('--dataset_name')
@@ -72,6 +66,11 @@ def main(args=None, do_train=False, do_eval=False, do_predict=False):
             sys.argv.append(model_output_dir)
             sys.argv.append('--overwrite_output_dir')
             sys.argv.append('--do_predict')
+
+        else:
+            sys.argv.append('--output_dir')
+            sys.argv.append(model_output_dir)
+            sys.argv.append('--do_train') if do_train else sys.argv.append('--do_eval')
 
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
@@ -84,6 +83,9 @@ def main(args=None, do_train=False, do_eval=False, do_predict=False):
 
     training_args.save_steps = config['hyperparameters']['save_steps']
     model_args.augmentation_list = config['augmentation']['active']
+
+    if do_eval:
+        model_args.model_name_or_path = args['model_path']
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -    %(message)s",

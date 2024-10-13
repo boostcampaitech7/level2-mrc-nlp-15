@@ -1,7 +1,6 @@
 import os
 import yaml
 import time
-
 import main
 
 os.path.join(os.path.dirname(__file__), 'config.yaml')
@@ -48,8 +47,8 @@ if __name__ == '__main__':
             main.main(args, do_train=True)
 
         else:
-            args['model_path'] = os.path.join(model_dir, model_dirs[0])
-            args['output_path'] = os.path.join(output_dir, model_dirs[0])
+            args['model_path'] = os.path.join(model_dir, model_dirs[-1])
+            args['output_path'] = os.path.join(output_dir, model_dirs[-1])
 
     main.main(args, do_eval=True)
     main.main(args, do_predict=True)
