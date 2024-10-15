@@ -32,16 +32,24 @@ class ModelArguments:
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
     )
-    #################################################################################
     batch_size: int = field(
-        default=16
+        default=16,
+        metadata={
+            "help": "Batch size for training"
+        },
     )
-    
     num_epochs: int = field(
-        default=3
+        default=3,
+        metadata={
+            "help": "Number of epochs for training"
+        },
     )
-
-    #################################################################################
+    retriever_name: Optional[str] = field(
+        default="tfidf",
+        metadata={
+            "help": "Name of the retriever to use"
+        },
+    )
 
 
 @dataclass
@@ -52,15 +60,21 @@ class DataTrainingArguments:
 
     dataset_name: Optional[str] = field(
         default="../data/train_dataset",
-        metadata={"help": "The name of the dataset to use."},
+        metadata={
+            "help": "The name of the dataset to use."
+        },
     )
     overwrite_cache: bool = field(
         default=False,
-        metadata={"help": "Overwrite the cached training and evaluation sets"},
+        metadata={
+            "help": "Overwrite the cached training and evaluation sets"
+        },
     )
     preprocessing_num_workers: Optional[int] = field(
         default=None,
-        metadata={"help": "The number of processes to use for the preprocessing."},
+        metadata={
+            "help": "The number of processes to use for the preprocessing."
+        },
     )
     max_seq_length: int = field(
         default=512,
@@ -92,10 +106,15 @@ class DataTrainingArguments:
     )
     eval_retrieval: bool = field(
         default=True,
-        metadata={"help": "Whether to run passage retrieval using sparse embedding."},
+        metadata={
+            "help": "Whether to run passage retrieval using sparse embedding."
+        },
     )
     num_clusters: int = field(
-        default=64, metadata={"help": "Define how many clusters to use for faiss."}
+        default=64,
+        metadata={
+            "help": "Define how many clusters to use for faiss."
+        },
     )
     top_k_retrieval: int = field(
         default=20,
@@ -104,16 +123,21 @@ class DataTrainingArguments:
         },
     )
     use_faiss: bool = field(
-        default=True, metadata={"help": "Whether to build with faiss"}
+        default=True,
+        metadata={
+            "help": "Whether to build with faiss"
+        },
     )
-    # save_total_limit: int = field(
-    #     default = 1,
-    #     metadata = {"help" : "Number of save model checkpoint"}
-    # )
     dense_encoder_type: str = field(
-        default = 'hybrid', metadata = {"help": "Whether to run passage retrieval using dense embedding."}
+        default = 'hybrid',
+        metadata = {
+            "help": "Whether to run passage retrieval using dense embedding."
+        },
     )
     
     remove_char: bool = field(
-        default=True, metadata={"help": "Whether to remove special character before embedding"}
+        default=True,
+        metadata={
+            "help": "Whether to remove special character before embedding"
+        },
     )
