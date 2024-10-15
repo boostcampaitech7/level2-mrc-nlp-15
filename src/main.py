@@ -1,22 +1,20 @@
-import datetime
 import logging
 import os
 import sys
-import numpy as np
-from typing import Callable, List, NoReturn, Tuple
+from datetime import datetime
+from typing import Callable, List, NoReturn, Tuple, Dict, Any
 
-from arguments import DataTrainingArguments, ModelArguments
+import evaluate
+import numpy as np
+import wandb
 from datasets import (
     Dataset,
     DatasetDict,
     Features,
-    Value,
     Sequence,
+    Value,
     load_from_disk,
-    load_metric
 )
-from qa_trainer import QATrainer
-from retriever import SparseRetrieval
 from transformers import (
     AutoConfig,
     AutoModelForQuestionAnswering,
@@ -26,18 +24,56 @@ from transformers import (
     HfArgumentParser,
     TrainingArguments,
 )
+
+from arguments import ModelArguments, DataTrainingArguments
+from qa_trainer import QATrainer
+from retriever import SparseRetrieval
+from retriever_bm25 import BM25SparseRetrieval
 from utils import set_seed, check_no_error, postprocess_qa_predictions
-import wandb
+
 
 logger = logging.getLogger(__name__)
-wandb.init(project="odqa",
-           name="run_" + (datetime.datetime.now() + datetime.timedelta(hours=9)).strftime("%Y%m%d_%H%M%S"))
 
 def main():
     parser = HfArgumentParser(
         (ModelArguments, DataTrainingArguments, TrainingArguments)
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    training_args.save_steps = 0
+
+    current_datetime = datetime.now().strftime("%Y%m%d_%H%M")
+    if training_args.do_train:
+        try:
+            model_name_parts = model_args.model_name_or_path.split("/")
+            model_name_init = model_name_parts[-1].split("-")[0]
+            extracted_name = f"{model_name_parts[0]}_{model_name_init}"
+        except Exception as e:
+            print(f"FileNameWarning: {e}")
+            print("Setting extracted_name to 'model'...")
+
+            extracted_name = "model"
+
+        new_folder_name = f"{extracted_name}_{current_datetime}"
+    elif training_args.do_eval:
+        new_folder_name = f"{model_args.model_name_or_path.split('/')[-1]}_eval_{current_datetime}"
+    elif training_args.do_predict:
+        new_folder_name = f"{model_args.model_name_or_path.split('/')[-1]}_pred_{current_datetime}"
+
+    training_args.output_dir = os.path.join(training_args.output_dir, new_folder_name)
+
+    if training_args.do_eval:
+        wandb_run_name = f"[eval] {new_folder_name}"
+    if training_args.do_train:
+        wandb_run_name = f"[train] {new_folder_name}"
+    if training_args.do_predict:
+        wandb_run_name = f"[pred] {new_folder_name}"
+
+    wandb.init(project="odqa",
+               entity="nlp15",
+               name=wandb_run_name,
+               config=vars(training_args))
+    wandb.config.update({k: v for k, v in vars(model_args).items() if k != "model_name_or_path"})
+    wandb.config.update(vars(data_args))
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -    %(message)s",
@@ -45,15 +81,14 @@ def main():
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    logging.info(f"model is from {model_args.model_name_or_path}")
-    logging.info(f"data is from {data_args.dataset_name}")
-
-    logger.info("Training/evaluation parameters %s", training_args)
+    logging.info("Model Arguments\n%s", model_args)
+    logging.info("Data Training Arguments\n%s", data_args)
+    logging.info("Training Arguments\n%s", training_args)
 
     set_seed(training_args.seed)
 
     datasets = load_from_disk(data_args.dataset_name)
-    print(datasets)
+    logging.info("datasets:", datasets)
 
     config = AutoConfig.from_pretrained(
         model_args.config_name
@@ -79,6 +114,12 @@ def main():
 
     run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
 
+    wandb.finish()
+
+
+def is_roberta_model(tokenizer):
+    return isinstance(tokenizer, AutoTokenizer.from_pretrained("roberta-base").__class__)
+
 
 def prepare_train_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, data_args, answer_column_name):
     tokenized_examples = tokenizer(
@@ -89,7 +130,7 @@ def prepare_train_features(examples, tokenizer, question_column_name, pad_on_rig
         stride=data_args.doc_stride,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
-        return_token_type_ids=False, # True if bert, False if roberta
+        return_token_type_ids=not is_roberta_model(tokenizer=tokenizer),
         padding="max_length" if data_args.pad_to_max_length else False,
     )
 
@@ -151,12 +192,16 @@ def run_sparse_retrieval(
     data_path: str = "../data",
     context_path: str = "wikipedia_documents.json",
 ) -> DatasetDict:
-    retriever = SparseRetrieval(
-        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
+
+    retriever = BM25SparseRetrieval(
+        tokenize_fn=tokenize_fn,
+        args=data_args,  # args를 전달
+        data_path=data_path,
+        context_path=context_path
     )
     retriever.get_sparse_embedding()
 
-    if data_args.use_faiss:
+    if data_args.use_faiss and isinstance(retriever, SparseRetrieval):
         retriever.build_faiss(num_clusters=data_args.num_clusters)
         df = retriever.retrieve_faiss(
             datasets["validation"], topk=data_args.top_k_retrieval
@@ -202,7 +247,7 @@ def prepare_validation_features(examples, tokenizer, question_column_name, pad_o
         stride=data_args.doc_stride,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
-        return_token_type_ids=False, # True if bert, False if roberta
+        return_token_type_ids=not is_roberta_model(tokenizer=tokenizer),
         padding="max_length" if data_args.pad_to_max_length else False,
     )
 
@@ -293,7 +338,7 @@ def run_mrc(
         tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None
     )
 
-    metric = load_metric("squad")
+    metric = evaluate.load("squad")
 
     def post_processing_function(
         examples,
