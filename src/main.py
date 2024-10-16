@@ -117,11 +117,7 @@ def main():
     wandb.finish()
 
 
-def is_roberta_model(tokenizer):
-    return isinstance(tokenizer, AutoTokenizer.from_pretrained("roberta-base").__class__)
-
-
-def prepare_train_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, data_args, answer_column_name):
+def prepare_train_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, data_args, answer_column_name, is_bert_fam):
     tokenized_examples = tokenizer(
         examples[question_column_name if pad_on_right else context_column_name],
         examples[context_column_name if pad_on_right else question_column_name],
@@ -130,7 +126,7 @@ def prepare_train_features(examples, tokenizer, question_column_name, pad_on_rig
         stride=data_args.doc_stride,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
-        return_token_type_ids=not is_roberta_model(tokenizer=tokenizer),
+        return_token_type_ids=is_bert_fam,
         padding="max_length" if data_args.pad_to_max_length else False,
     )
 
@@ -238,7 +234,7 @@ def run_sparse_retrieval(
     return datasets
 
 
-def prepare_validation_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, data_args, answer_column_name):
+def prepare_validation_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, data_args, answer_column_name, is_bert_fam):
     tokenized_examples = tokenizer(
         examples[question_column_name if pad_on_right else context_column_name],
         examples[context_column_name if pad_on_right else question_column_name],
@@ -247,7 +243,7 @@ def prepare_validation_features(examples, tokenizer, question_column_name, pad_o
         stride=data_args.doc_stride,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
-        return_token_type_ids=not is_roberta_model(tokenizer=tokenizer),
+        return_token_type_ids=is_bert_fam,
         padding="max_length" if data_args.pad_to_max_length else False,
     )
 
@@ -300,6 +296,7 @@ def run_mrc(
         train_dataset = train_dataset.map(
             prepare_train_features,
             fn_kwargs={
+                'is_bert_fam': model_args.is_model_bert_family,
                 'tokenizer': tokenizer,
                 'pad_on_right': pad_on_right,
                 'max_seq_length': max_seq_length,
@@ -320,6 +317,7 @@ def run_mrc(
         eval_dataset = eval_dataset.map(
             prepare_validation_features,
             fn_kwargs={
+                'is_bert_fam': model_args.is_model_bert_family,
                 'tokenizer': tokenizer,
                 'pad_on_right': pad_on_right,
                 'max_seq_length': max_seq_length,

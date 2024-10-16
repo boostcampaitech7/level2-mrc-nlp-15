@@ -14,6 +14,12 @@ class ModelArguments:
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
     )
+    is_model_bert_family: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether the model is from BERT family"
+        },
+    )
     config_name: Optional[str] = field(
         default="klue/roberta-large",
         metadata={
@@ -27,7 +33,7 @@ class ModelArguments:
         },
     )
     tokenizer_name: Optional[str] = field(
-        default=None,
+        default="klue/roberta-large",
         metadata={
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },

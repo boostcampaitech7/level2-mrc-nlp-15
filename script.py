@@ -22,7 +22,7 @@ def extract_timestamp(dir_name):
     return None
 
 def find_model_dir(timestamp=None):
-    models_root = '/data/ephemeral/home/level2-mrc-nlp-15/models'
+    models_root = os.path.join(os.sep, 'data', 'ephemeral', 'home', 'level2-mrc-nlp-15', 'models')
     model_dir = None
 
     if timestamp:
@@ -74,23 +74,25 @@ def find_model_dir(timestamp=None):
             return None
 
 def main(timestamp=None):
-    base_directory = os.path.join('data', 'ephemeral', 'home', 'level2-mrc-nlp-15')
+    base_directory = os.path.join(os.sep, 'data', 'ephemeral', 'home', 'level2-mrc-nlp-15')
     os.chdir(os.path.join(base_directory, 'src'))
 
-    model_dir = find_model_dir(timestamp)
-    if not model_dir and not timestamp:
-        train_output_dir = os.path.join(base_directory, 'models')
-        
+    if not timestamp:
+        print("Training a new model.")
+
         # Training and Evaluation
         run_command([
             'python', 'main.py',
-            '--output_dir', train_output_dir,
+            '--output_dir', os.path.join(base_directory, 'output'),
             '--do_train'
         ])
         model_dir = find_model_dir()  # Find the latest model directory
     elif not model_dir:
         # Could not find model directory with the provided timestamp
+        print("Error: Could not find a suitable model directory.")
         return
+    else:
+        model_dir = find_model_dir(timestamp)
 
     # Evaluation
     run_command([
