@@ -33,8 +33,8 @@ import wandb
 import augmentation
 
 logger = logging.getLogger(__name__)
-wandb.init(project="odqa",
-           name="run_" + (datetime.datetime.now() + datetime.timedelta(hours=9)).strftime("%Y%m%d_%H%M%S"))
+# wandb.init(project="odqa",
+#            name="run_" + (datetime.datetime.now() + datetime.timedelta(hours=9)).strftime("%Y%m%d_%H%M%S"))
 
 def main():
     parser = HfArgumentParser(
@@ -76,14 +76,26 @@ def main():
         config=config,
     )
 
-    data_args.b_is_bert_base = isinstance(model, transformers.BertPreTrainedModel)
+    # print model arch
+    print(model)
 
-    if training_args.do_predict and data_args.eval_retrieval:
-        datasets = run_sparse_retrieval(
-            tokenizer.tokenize, datasets, training_args, data_args,
-        )
+    # Add CNN Layer in RobertaOutput
+    model.roberta.encoder.layer[-1] = transformers.models.roberta.modeling_roberta.RobertaLayer(
+        config,
+        layer_id=24,
+        layer_num=24,
+        layer_norm_eps=1e-5,
+        layer_norm_first=True,
+        use_cache=True,
 
-    run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
+    # data_args.b_is_bert_base = isinstance(model, transformers.BertPreTrainedModel)
+    #
+    # if training_args.do_predict and data_args.eval_retrieval:
+    #     datasets = run_sparse_retrieval(
+    #         tokenizer.tokenize, datasets, training_args, data_args,
+    #     )
+    #
+    # run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
 def prepare_train_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, data_args, answer_column_name):
