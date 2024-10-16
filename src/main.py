@@ -5,6 +5,8 @@ import sys
 import numpy as np
 from typing import Callable, List, NoReturn, Tuple
 
+import transformers
+
 from arguments import DataTrainingArguments, ModelArguments
 from datasets import (
     Dataset,
@@ -28,6 +30,7 @@ from transformers import (
 )
 from utils import set_seed, check_no_error, postprocess_qa_predictions
 import wandb
+import augmentation
 
 logger = logging.getLogger(__name__)
 wandb.init(project="odqa",
@@ -73,6 +76,8 @@ def main():
         config=config,
     )
 
+    data_args.b_is_bert_base = isinstance(model, transformers.BertPreTrainedModel)
+
     if training_args.do_predict and data_args.eval_retrieval:
         datasets = run_sparse_retrieval(
             tokenizer.tokenize, datasets, training_args, data_args,
@@ -90,7 +95,7 @@ def prepare_train_features(examples, tokenizer, question_column_name, pad_on_rig
         stride=data_args.doc_stride,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
-        return_token_type_ids=False, # True if bert, False if roberta
+        return_token_type_ids=data_args.b_is_bert_base, # True if bert, False if roberta
         padding="max_length" if data_args.pad_to_max_length else False,
     )
 
@@ -207,7 +212,7 @@ def prepare_validation_features(examples, tokenizer, question_column_name, pad_o
         stride=data_args.doc_stride,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
-        return_token_type_ids=False, # True if bert, False if roberta
+        return_token_type_ids=data_args.b_is_bert_base, # True if bert, False if roberta
         padding="max_length" if data_args.pad_to_max_length else False,
     )
 
@@ -256,6 +261,10 @@ def run_mrc(
         if "train" not in datasets:
             raise ValueError("--do_train requires a train dataset")
         train_dataset = datasets["train"]
+
+        if data_args.augmentation is True:
+            logging.info("Augmentation is defined. Working on Augmentation...")
+            train_dataset = augmentation.augmentation(train_dataset, tokenizer)
 
         train_dataset = train_dataset.map(
             prepare_train_features,
@@ -388,7 +397,4 @@ def run_mrc(
 
 
 if __name__ == "__main__":
-    #main()
-    import torch
-    print(torch.__version__)
-    print(torch.cuda.is_available())
+    main()

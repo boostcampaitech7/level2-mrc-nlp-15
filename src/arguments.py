@@ -69,6 +69,10 @@ class DataTrainingArguments:
             "than this will be truncated, sequences shorter will be padded."
         },
     )
+    augmentation: bool = field(
+        default=False,
+        metadata={"help": "Whether to use data augmentation."},
+    ),
     pad_to_max_length: bool = field(
         default=False,
         metadata={
@@ -116,4 +120,7 @@ class DataTrainingArguments:
     
     remove_char: bool = field(
         default=True, metadata={"help": "Whether to remove special character before embedding"}
+    )
+    b_is_bert_base: bool = field(
+        default=False, metadata={"help": "Whether to use bert model"}
     )
