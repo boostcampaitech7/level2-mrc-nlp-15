@@ -83,14 +83,14 @@ def main(timestamp=None):
         # Training and Evaluation
         run_command([
             'python', 'main.py',
-            '--output_dir', os.path.join(base_directory, 'output'),
+            '--output_dir', os.path.join(base_directory, 'models'),
             '--do_train'
         ])
         model_dir = find_model_dir()  # Find the latest model directory
-    elif not model_dir:
-        # Could not find model directory with the provided timestamp
-        print("Error: Could not find a suitable model directory.")
-        return
+        if not model_dir:
+            # Could not find model directory with the provided timestamp
+            print("Error: Could not find a suitable model directory.")
+            return
     else:
         model_dir = find_model_dir(timestamp)
 
