@@ -9,19 +9,19 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        default="klue/roberta-large",
+        default="CurtisJeon/klue-roberta-large-korquad_v1_qa",
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
     )
     config_name: Optional[str] = field(
-        default="klue/roberta-large",
+        default="CurtisJeon/klue-roberta-large-korquad_v1_qa",
         metadata={
             "help": "Pretrained config name or path if not the same as model_name"
         },
     )
     config_name_dpr: Optional[str] = field(
-        default='klue/roberta-large',
+        default='CurtisJeon/klue-roberta-large-korquad_v1_qa',
         metadata={
             "help": "Pretrained config name or path if not the same as model_name"
         },

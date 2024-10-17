@@ -9,6 +9,7 @@ import argparse
 import numpy as np
 import pandas as pd
 from datasets import Dataset, concatenate_datasets, load_from_disk
+# from rank_bm25 import BM25Okapi
 from rank_bm25 import BM25Plus
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer
@@ -25,7 +26,7 @@ class BM25SparseRetrieval:
     def __init__(self, tokenize_fn, args, data_path: Optional[str] = "../data/", context_path: Optional[str] = "wikipedia_documents.json") -> None:
         self.tokenizer = tokenize_fn
         self.data_path = data_path
-        self.args = args
+        self.args = args 
         
         # 위키 문서 로드
         with open(os.path.join(data_path, context_path), "r", encoding="utf-8") as f:
@@ -39,7 +40,7 @@ class BM25SparseRetrieval:
 
     def get_sparse_embedding(self) -> None:
         """BM25+로 Passage Embedding을 만들고 초기화합니다."""
-        pickle_name = "bm25plus_sparse_embedding.bin"
+        pickle_name = "bm25plus_sparse_embedding_optuna.bin"
         emd_path = os.path.join(self.data_path, pickle_name)
 
         if os.path.isfile(emd_path):
@@ -49,7 +50,7 @@ class BM25SparseRetrieval:
         else:
             print("Build passage embedding")
             tokenized_corpus = [self.tokenizer(doc) for doc in self.contexts]
-            self.bm25 = BM25Plus(tokenized_corpus)  # BM25Plus로 변경
+            self.bm25 = BM25Plus(tokenized_corpus, k1=1.7595, b=0.9172, delta=1.1490)  # BM25Plus로 변경 후 하이퍼파라미터 Optuna test1 적용
             with open(emd_path, "wb") as file:
                 pickle.dump(self.bm25, file)
             print("Embedding pickle saved.")
@@ -86,7 +87,7 @@ class BM25SparseRetrieval:
                 total.append(tmp)
 
             return pd.DataFrame(total)    
-        
+
 
     def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
         """개별 질의에 대한 상위 k개의 Passage 검색"""

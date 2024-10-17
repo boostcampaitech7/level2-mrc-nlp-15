@@ -16,7 +16,7 @@ from datasets import (
     load_metric
 )
 from qa_trainer import QATrainer
-from retrieval_BM25 import BM25SparseRetrieval
+from retrieval_BM25Plus import BM25SparseRetrieval
 from transformers import (
     AutoConfig,
     AutoModelForQuestionAnswering,
