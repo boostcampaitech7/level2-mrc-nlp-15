@@ -24,7 +24,7 @@ def augmentation(train_dataset : datasets.Dataset, tokenizer : dict):
     train_dataset_ = copy.deepcopy(train_dataset)
 
     #train_dataset_ = stop_word(train_dataset_, tokenizer, )
-    #train_dataset_ = random_truncation_all(train_dataset_, )
+    train_dataset_ = random_truncation_all(train_dataset_, )
     #train_dataset_ = swap_sentence(train_dataset_, tokenizer, ratio=0.33)
     #train_dataset_ = random_truncation(train_dataset_, )
     train_dataset_ = AEDA(train_dataset_, tokenizer, )
@@ -35,7 +35,7 @@ def augmentation(train_dataset : datasets.Dataset, tokenizer : dict):
 
     return train_dataset_
 
-def random_truncation(train_dataset : datasets.Dataset, ratio=0.7, shred=0.44, concat=True):
+def random_truncation(train_dataset : datasets.Dataset, ratio=0.3, shred=0.44, concat=True):
     if shred > 1.0:
         raise ValueError("shred must be less than 1.0")
 
@@ -81,7 +81,7 @@ def random_truncation(train_dataset : datasets.Dataset, ratio=0.7, shred=0.44, c
 
     return datasets.concatenate_datasets([train_dataset, train_dataset_]) if concat else datasets.concatenate_datasets([train_dataset_left, train_dataset_])
 
-def random_truncation_all(train_dataset : datasets.Dataset, ratio=0.6, concat=True):
+def random_truncation_all(train_dataset : datasets.Dataset, ratio=0.75, concat=True):
     choice = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio <= 1 else ratio, replace=False)
     train_dataset_ = train_dataset.select(choice)
 
@@ -91,7 +91,7 @@ def random_truncation_all(train_dataset : datasets.Dataset, ratio=0.6, concat=Tr
 
     #print_sample(train_dataset_)
 
-    def preprocess_random_truncation(example, id_start):
+    def preprocess(example, id_start):
         id_start = 1000000
         original_context = example['context']
         # ID 및 인덱스 설정
@@ -150,7 +150,7 @@ def random_truncation_all(train_dataset : datasets.Dataset, ratio=0.6, concat=Tr
         return example
 
     train_dataset_ = train_dataset_.map(
-        preprocess_random_truncation,
+        preprocess,
         with_indices=True,
     )
 
@@ -158,7 +158,7 @@ def random_truncation_all(train_dataset : datasets.Dataset, ratio=0.6, concat=Tr
 
     return datasets.concatenate_datasets([train_dataset, train_dataset_]) if concat else datasets.concatenate_datasets([train_dataset_left, train_dataset_])
 
-def AEDA(train_dataset : datasets.Dataset, tokenizer : dict, ratio=0.7, min_puncation=3, max_puncation=4, concat=True):
+def AEDA(train_dataset : datasets.Dataset, tokenizer : dict, ratio=0.3, min_puncation=3, max_puncation=4, concat=True):
     random_idx = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio <= 1 else ratio, replace=False)
     train_dataset_ = train_dataset.select(random_idx)
 

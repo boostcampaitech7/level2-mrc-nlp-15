@@ -297,25 +297,24 @@ def run_mrc(
             load_from_cache_file=not data_args.overwrite_cache,
         )
 
-    if training_args.do_eval or training_args.do_predict:
-        eval_dataset = datasets["validation"]
+    eval_dataset = datasets["validation"]
 
-        eval_dataset = eval_dataset.map(
-            prepare_validation_features,
-            fn_kwargs={
-                'tokenizer': tokenizer,
-                'pad_on_right': pad_on_right,
-                'max_seq_length': max_seq_length,
-                'data_args': data_args,
-                'question_column_name': question_column_name,
-                'context_column_name': context_column_name,
-                'answer_column_name': answer_column_name
-            },
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-        )
+    eval_dataset = eval_dataset.map(
+        prepare_validation_features,
+        fn_kwargs={
+            'tokenizer': tokenizer,
+            'pad_on_right': pad_on_right,
+            'max_seq_length': max_seq_length,
+            'data_args': data_args,
+            'question_column_name': question_column_name,
+            'context_column_name': context_column_name,
+            'answer_column_name': answer_column_name
+        },
+        batched=True,
+        num_proc=data_args.preprocessing_num_workers,
+        remove_columns=column_names,
+        load_from_cache_file=not data_args.overwrite_cache,
+    )
 
     data_collator = DataCollatorWithPadding(
         tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None
@@ -351,12 +350,15 @@ def run_mrc(
                 predictions=formatted_predictions, label_ids=references
             )
 
+    training_args.eval_steps = 100
+    training_args.eval_strategy = "steps"
+
     trainer = QATrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=eval_dataset if training_args.do_eval else None,
-        eval_examples=datasets["validation"] if training_args.do_eval else None,
+        eval_dataset=eval_dataset,
+        eval_examples=datasets["validation"],
         tokenizer=tokenizer,
         data_collator=data_collator,
         post_process_function=post_processing_function,
