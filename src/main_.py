@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import numpy as np
+import time
 from typing import Callable, List, NoReturn, Tuple
 
 import transformers
@@ -21,7 +22,6 @@ from datasets import (
 )
 from qa_trainer import QATrainer
 from retrieval_BM25 import BM25SparseRetrieval
-from retriever_BM25_Plus import BM25SparseRetrieval_Plus
 from transformers import (
     AutoConfig,
     AutoModelForQuestionAnswering,
@@ -32,12 +32,20 @@ from transformers import (
     TrainingArguments,
 )
 from utils import set_seed, check_no_error, postprocess_qa_predictions
+from datasets import load_dataset
+from sympy.codegen.fnodes import use
+from transformers import AutoTokenizer, AutoModelForCausalLM, Trainer, TrainingArguments
 
 logger = logging.getLogger(__name__)
-wandb.init(project="odqa",
-           name="run_" + (datetime.datetime.now() + datetime.timedelta(hours=9)).strftime("%Y%m%d_%H%M%S"))
+# wandb.init(project="odqa",
+#            name="run_" + (datetime.datetime.now() + datetime.timedelta(hours=9)).strftime("%Y%m%d_%H%M%S"))
 
 def main():
+    sys.argv = sys.argv[:1]
+    sys.argv.append("--output_dir")
+    sys.argv.append(f"models/gemma_test_{time.strftime('%Y%m%d_%H%M%S')}")
+    sys.argv.append("--do_train")
+
     parser = HfArgumentParser(
         (ModelArguments, DataTrainingArguments, TrainingArguments)
     )
@@ -57,24 +65,15 @@ def main():
 
     set_seed(training_args.seed)
 
-    datasets = load_from_disk(data_args.dataset_name)
+    #datasets = load_from_disk(data_args.dataset_name)
+    datasets = load_dataset("KorQuAD/squad_kor_v1")
     print(datasets)
 
-    config = AutoConfig.from_pretrained(
-        model_args.config_name
-        if model_args.config_name is not None
-        else model_args.model_name_or_path,
-    )
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name
-        if model_args.tokenizer_name is not None
-        else model_args.model_name_or_path,
-        use_fast=True,
-    )
-    model = AutoModelForQuestionAnswering.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
+    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b", token="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")
+    model = AutoModelForCausalLM.from_pretrained(
+        "google/gemma-2-2b",
+        device_map="auto",
+        token="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",
     )
 
     # print model arch
@@ -90,67 +89,67 @@ def main():
     run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
-def prepare_train_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, data_args, answer_column_name):
-    tokenized_examples = tokenizer(
-        examples[question_column_name if pad_on_right else context_column_name],
-        examples[context_column_name if pad_on_right else question_column_name],
-        truncation="only_second" if pad_on_right else "only_first",
-        max_length=max_seq_length,
-        stride=data_args.doc_stride,
-        return_overflowing_tokens=True,
-        return_offsets_mapping=True,
-        return_token_type_ids=data_args.b_is_bert_base, # True if bert, False if roberta
-        padding="max_length" if data_args.pad_to_max_length else False,
-    )
-
-    sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
-    offset_mapping = tokenized_examples.pop("offset_mapping")
-
-    tokenized_examples["start_positions"] = []
-    tokenized_examples["end_positions"] = []
-
-    for i, offsets in enumerate(offset_mapping):
-        input_ids = tokenized_examples["input_ids"][i]
-        cls_index = input_ids.index(tokenizer.cls_token_id)
-
-        sequence_ids = tokenized_examples.sequence_ids(i)
-
-        sample_index = sample_mapping[i]
-        answers = examples[answer_column_name][sample_index]
-
-        if len(answers["answer_start"]) == 0:
-            tokenized_examples["start_positions"].append(cls_index)
-            tokenized_examples["end_positions"].append(cls_index)
-        else:
-            start_char = answers["answer_start"][0]
-            end_char = start_char + len(answers["text"][0])
-
-            token_start_index = 0
-            while sequence_ids[token_start_index] != (1 if pad_on_right else 0):
-                token_start_index += 1
-
-            token_end_index = len(input_ids) - 1
-            while sequence_ids[token_end_index] != (1 if pad_on_right else 0):
-                token_end_index -= 1
-
-            if not (
-                offsets[token_start_index][0] <= start_char
-                and offsets[token_end_index][1] >= end_char
-            ):
-                tokenized_examples["start_positions"].append(cls_index)
-                tokenized_examples["end_positions"].append(cls_index)
-            else:
-                while (
-                    token_start_index < len(offsets)
-                    and offsets[token_start_index][0] <= start_char
-                ):
-                    token_start_index += 1
-                tokenized_examples["start_positions"].append(token_start_index - 1)
-                while offsets[token_end_index][1] >= end_char:
-                    token_end_index -= 1
-                tokenized_examples["end_positions"].append(token_end_index + 1)
-
-    return tokenized_examples
+# def prepare_train_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, data_args, answer_column_name):
+#     tokenized_examples = tokenizer(
+#         examples[question_column_name if pad_on_right else context_column_name],
+#         examples[context_column_name if pad_on_right else question_column_name],
+#         truncation="only_second" if pad_on_right else "only_first",
+#         max_length=max_seq_length,
+#         stride=data_args.doc_stride,
+#         return_overflowing_tokens=True,
+#         return_offsets_mapping=True,
+#         return_token_type_ids=data_args.b_is_bert_base, # True if bert, False if roberta
+#         padding="max_length" if data_args.pad_to_max_length else False,
+#     )
+#
+#     sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
+#     offset_mapping = tokenized_examples.pop("offset_mapping")
+#
+#     tokenized_examples["start_positions"] = []
+#     tokenized_examples["end_positions"] = []
+#
+#     for i, offsets in enumerate(offset_mapping):
+#         input_ids = tokenized_examples["input_ids"][i]
+#         cls_index = input_ids.index(tokenizer.cls_token_id)
+#
+#         sequence_ids = tokenized_examples.sequence_ids(i)
+#
+#         sample_index = sample_mapping[i]
+#         answers = examples[answer_column_name][sample_index]
+#
+#         if len(answers["answer_start"]) == 0:
+#             tokenized_examples["start_positions"].append(cls_index)
+#             tokenized_examples["end_positions"].append(cls_index)
+#         else:
+#             start_char = answers["answer_start"][0]
+#             end_char = start_char + len(answers["text"][0])
+#
+#             token_start_index = 0
+#             while sequence_ids[token_start_index] != (1 if pad_on_right else 0):
+#                 token_start_index += 1
+#
+#             token_end_index = len(input_ids) - 1
+#             while sequence_ids[token_end_index] != (1 if pad_on_right else 0):
+#                 token_end_index -= 1
+#
+#             if not (
+#                 offsets[token_start_index][0] <= start_char
+#                 and offsets[token_end_index][1] >= end_char
+#             ):
+#                 tokenized_examples["start_positions"].append(cls_index)
+#                 tokenized_examples["end_positions"].append(cls_index)
+#             else:
+#                 while (
+#                     token_start_index < len(offsets)
+#                     and offsets[token_start_index][0] <= start_char
+#                 ):
+#                     token_start_index += 1
+#                 tokenized_examples["start_positions"].append(token_start_index - 1)
+#                 while offsets[token_end_index][1] >= end_char:
+#                     token_end_index -= 1
+#                 tokenized_examples["end_positions"].append(token_end_index + 1)
+#
+#     return tokenized_examples
 
 
 def run_sparse_retrieval(
@@ -168,13 +167,6 @@ def run_sparse_retrieval(
         data_path=data_path,
         context_path=context_path
     )
-
-    # retriever = BM25SparseRetrieval_Plus(
-    #     tokenize_fn=tokenize_fn,
-    #     args=data_args,  # args를 전달
-    #     data_path=data_path,
-    #     context_path=context_path
-    # )
     retriever.get_sparse_embedding()
 
     # if data_args.use_faiss:
@@ -280,17 +272,24 @@ def run_mrc(
             train_dataset = augmentation.augmentation(train_dataset, tokenizer)
             print("model length is : ", len(train_dataset))
 
+        def prepare_train_features(examples):
+            # 질문과 문맥을 결합
+            inputs = [f"질문: {q} 문맥: {c} 정답:" for q, c in zip(examples["question"], examples["context"])]
+            targets = [a["text"][0] for a in examples["answers"]]
+
+            # 토크나이즈 및 패딩
+            model_inputs = tokenizer(inputs, max_length=384, padding="max_length", truncation=True)
+            labels = tokenizer(targets, max_length=64, padding="max_length", truncation=True)
+
+            # Padding을 무시하도록 -100으로 설정
+            model_inputs["labels"] = [
+                [(label if label != tokenizer.pad_token_id else -100) for label in label_seq]
+                for label_seq in labels["input_ids"]
+            ]
+            return model_inputs
+
         train_dataset = train_dataset.map(
             prepare_train_features,
-            fn_kwargs={
-                'tokenizer': tokenizer,
-                'pad_on_right': pad_on_right,
-                'max_seq_length': max_seq_length,
-                'data_args': data_args,
-                'question_column_name': question_column_name,
-                'context_column_name': context_column_name,
-                'answer_column_name': answer_column_name
-            },
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,

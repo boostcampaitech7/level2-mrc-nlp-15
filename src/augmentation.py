@@ -1,3 +1,5 @@
+import os
+
 import datasets
 import random
 import numpy as np
@@ -5,7 +7,12 @@ import copy
 import time
 import pandas as pd
 import re
+import nltk
 from transformers import PreTrainedTokenizer
+from konlpy.tag import Okt
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+
 def print_sample(train_dataset_):
     for k, v in train_dataset_[:1].items():
         print(f"{k} : {v}")
@@ -16,28 +23,27 @@ def print_sample(train_dataset_):
 def augmentation(train_dataset : datasets.Dataset, tokenizer : dict):
     train_dataset_ = copy.deepcopy(train_dataset)
 
+    #train_dataset_ = stop_word(train_dataset_, tokenizer, )
+    #train_dataset_ = random_truncation_all(train_dataset_, )
     #train_dataset_ = swap_sentence(train_dataset_, tokenizer, ratio=0.33)
     #train_dataset_ = random_truncation(train_dataset_, )
-    train_dataset_ = random_truncation_all(train_dataset_, )
     train_dataset_ = AEDA(train_dataset_, tokenizer, )
 
     # save augmented dataset
     timestamp = time.time()
     train_dataset.save_to_disk(f"../EDA/Train/train_augmented/{time.strftime('%Y%m%d_%H%M%S', time.localtime(timestamp))}.arrow")
 
-    # drop train_dataset_ that has same ['anwers']['text'] with train_dataset
-    # df = train_dataset_.to_pandas()
-    # df = df.drop_duplicates(subset=['answers'])
-    # train_dataset_ = datasets.Dataset.from_pandas(df)
-
     return train_dataset_
 
-def random_truncation(train_dataset : datasets.Dataset, ratio=0.7, shred=0.44):
+def random_truncation(train_dataset : datasets.Dataset, ratio=0.7, shred=0.44, concat=True):
     if shred > 1.0:
         raise ValueError("shred must be less than 1.0")
 
-    choice = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio < 1 else ratio)
+    choice = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio < 1 else ratio, replace=False)
     train_dataset_ = train_dataset.select(choice)
+
+    left_choice = list(set(range(len(train_dataset))) - set(choice))
+    train_dataset_left = train_dataset.select(left_choice)
 
     def preprocess_random_truncation(example, id_start):
         # ID 및 인덱스 설정
@@ -73,15 +79,20 @@ def random_truncation(train_dataset : datasets.Dataset, ratio=0.7, shred=0.44):
         with_indices=True,
     )
 
-    return datasets.concatenate_datasets([train_dataset, train_dataset_])
+    return datasets.concatenate_datasets([train_dataset, train_dataset_]) if concat else datasets.concatenate_datasets([train_dataset_left, train_dataset_])
 
-def random_truncation_all(train_dataset : datasets.Dataset, ratio=0.7):
-    choice = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio < 1 else ratio)
+def random_truncation_all(train_dataset : datasets.Dataset, ratio=0.6, concat=True):
+    choice = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio <= 1 else ratio, replace=False)
     train_dataset_ = train_dataset.select(choice)
+
+    # get left data that are not in choice
+    left_choice = list(set(range(len(train_dataset))) - set(choice))
+    train_dataset_left = train_dataset.select(left_choice)
 
     #print_sample(train_dataset_)
 
     def preprocess_random_truncation(example, id_start):
+        id_start = 1000000
         original_context = example['context']
         # ID 및 인덱스 설정
         example['id'] = f"mrc-id-0-{id_start}"
@@ -145,18 +156,20 @@ def random_truncation_all(train_dataset : datasets.Dataset, ratio=0.7):
 
     #print_sample(train_dataset_)
 
-    return datasets.concatenate_datasets([train_dataset, train_dataset_])
+    return datasets.concatenate_datasets([train_dataset, train_dataset_]) if concat else datasets.concatenate_datasets([train_dataset_left, train_dataset_])
 
-def AEDA(train_dataset : datasets.Dataset, tokenizer : dict, ratio=0.5, min_puncation=1, max_puncation=4):
-    random_idx = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio < 1 else ratio)
+def AEDA(train_dataset : datasets.Dataset, tokenizer : dict, ratio=0.7, min_puncation=3, max_puncation=4, concat=True):
+    random_idx = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio <= 1 else ratio, replace=False)
     train_dataset_ = train_dataset.select(random_idx)
 
+    # get left data that are not in choice
+    left_choice = list(set(range(len(train_dataset))) - set(random_idx))
+    train_dataset_left = train_dataset.select(left_choice)
     # print(train_dataset_[:1]['context'])
 
-    def preprocess_random_truncation(example, id_start):
+    def preprocess(example, id_start):
         punctuation_list = ['.', ',', '!', '?', ':', ';']
-        example = train_dataset_[0]
-        id_start = 10000000
+        id_start = 1000000
 
         # ID 및 인덱스 설정
         example['id'] = f"mrc-id-0-{id_start}"
@@ -183,18 +196,22 @@ def AEDA(train_dataset : datasets.Dataset, tokenizer : dict, ratio=0.5, min_punc
         return example
 
     train_dataset_ = train_dataset_.map(
-        preprocess_random_truncation,
+        preprocess,
         with_indices=True,
     )
 
     # print()
     # print(train_dataset_[:1]['context'])
 
-    return datasets.concatenate_datasets([train_dataset, train_dataset_])
+    return datasets.concatenate_datasets([train_dataset, train_dataset_]) if concat else train_dataset_
 
-def swap_sentence(train_dataset : datasets.Dataset, tokenizer : dict, ratio=0.33):
-    random_idx = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio <= 0.33 else ratio)
+def swap_sentence(train_dataset : datasets.Dataset, tokenizer : dict, ratio=0.33, concat=True):
+    random_idx = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio <= 0.33 else ratio, replace=False)
     train_dataset_ = train_dataset.select(random_idx)
+
+    # get left data that are not in choice
+    left_choice = list(set(range(len(train_dataset))) - set(random_idx))
+    train_dataset_left = train_dataset.select(left_choice)
 
     # for k, v in train_dataset_[:1].items():
     #     print(f"{k} : {v}")
@@ -283,7 +300,60 @@ def swap_sentence(train_dataset : datasets.Dataset, tokenizer : dict, ratio=0.33
     # print(f"answer_start : {answer_start}, answer_end : {answer_end}")
     # print(f"answer : {train_dataset_[:1]['context'][0][answer_start:answer_end]}")
 
-    return datasets.concatenate_datasets([train_dataset, train_dataset_])
+    return datasets.concatenate_datasets([train_dataset, train_dataset_]) if concat else datasets.concatenate_datasets([train_dataset_left, train_dataset_])
+
+def stop_word(train_dataset : datasets.Dataset, tokenizer : dict, ratio=1, concat=False):
+    random_idx = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio <= 1 else ratio, replace=False)
+    train_dataset_ = train_dataset.select(random_idx)
+
+    # get left data that are not in choice
+    left_choice = list(set(range(len(train_dataset))) - set(random_idx))
+    train_dataset_left = train_dataset.select(left_choice)
+
+    #print_sample(train_dataset_)
+    #nltk.download('punkt_tab')
+
+    def preprocess_random_truncation(example, id_start):
+        id_start = 1000000
+
+        # ID 및 인덱스 설정
+        example['id'] = f"mrc-id-0-{id_start}"
+        example['__index_level_0__'] = id_start
+
+        original_answer_start = example['answers']['answer_start'][0]
+        original_context = example['context']
+
+        answer_start = example['answers']['answer_start'][0]
+        context = example['context'][0:answer_start] + "HEREHERE" + example['context'][answer_start:]
+
+        # each line of stopwords.txt is stopword elem
+        stopwords = []
+
+        with open(os.path.join(os.getcwd(), 'src', 'stopwords.txt'), 'r', encoding='utf-8') as f:
+            for line in f:
+                stopwords.append(line.strip())
+
+        trim_words = word_tokenize(context)
+
+        example['context'] = ''
+        for word in trim_words:
+            if word not in stopwords:
+                example['context'] += word + ' '
+
+        answer_start = example['context'].find("HEREHERE")
+        example['answers']['answer_start'][0] = answer_start
+        example['context'] = example['context'].replace("HEREHERE", "")
+
+        return example
+
+    train_dataset_ = train_dataset_.map(
+        preprocess_random_truncation,
+        with_indices=True,
+    )
+
+    #print_sample(train_dataset_)
+
+    return datasets.concatenate_datasets([train_dataset, train_dataset_]) if concat else datasets.concatenate_datasets([train_dataset_left, train_dataset_])
 
 def analysis():
     validation_dataset_dir = "../data/train_dataset/validation/dataset.arrow"
@@ -439,7 +509,8 @@ if __name__ == "__main__":
     train_dataset_dir = "../data/train_dataset/train/dataset.arrow"
     train_dataset = datasets.Dataset.from_file(train_dataset_dir)
 
-    train_dataset = augmentation(train_dataset, tokenizer={})
+    #train_dataset = augmentation(train_dataset, tokenizer={})
     #analysis()
     #swap_sentence(train_dataset, tokenizer={}, ratio=1)
     #random_truncation_all(train_dataset)
+    stop_word(train_dataset, tokenizer={}, ratio=1)
