@@ -1,5 +1,4 @@
 import os
-
 import datasets
 import random
 import numpy as np
@@ -23,63 +22,17 @@ def print_sample(train_dataset_):
 def augmentation(train_dataset : datasets.Dataset, tokenizer : dict):
     train_dataset_ = copy.deepcopy(train_dataset)
 
-    #train_dataset_ = stop_word(train_dataset_, tokenizer, )
     train_dataset_ = random_truncation_all(train_dataset_, )
-    #train_dataset_ = swap_sentence(train_dataset_, tokenizer, ratio=0.33)
-    #train_dataset_ = random_truncation(train_dataset_, )
     train_dataset_ = AEDA(train_dataset_, tokenizer, )
+
+    #train_dataset_ = stop_word(train_dataset_, tokenizer, )
+    #train_dataset_ = swap_sentence(train_dataset_, tokenizer, ratio=0.33)
 
     # save augmented dataset
     timestamp = time.time()
     train_dataset.save_to_disk(f"../EDA/Train/train_augmented/{time.strftime('%Y%m%d_%H%M%S', time.localtime(timestamp))}.arrow")
 
     return train_dataset_
-
-def random_truncation(train_dataset : datasets.Dataset, ratio=0.3, shred=0.44, concat=True):
-    if shred > 1.0:
-        raise ValueError("shred must be less than 1.0")
-
-    choice = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio < 1 else ratio, replace=False)
-    train_dataset_ = train_dataset.select(choice)
-
-    left_choice = list(set(range(len(train_dataset))) - set(choice))
-    train_dataset_left = train_dataset.select(left_choice)
-
-    def preprocess_random_truncation(example, id_start):
-        # ID 및 인덱스 설정
-        example['id'] = f"mrc-id-0-{id_start}"
-        example['__index_level_0__'] = id_start
-
-        # 원래 context 길이
-        original_len = len(example['context'])
-        sample_start = example['answers']['answer_start'][0]
-
-        # context의 일정 비율을 자르기 위해 shred 비율 설정 (예: 0.2)
-        shred = 0.2
-        shred_len = int(original_len * shred)
-
-        # 왼쪽 및 오른쪽에서 잘라낼 수 있는 최대/최소 인덱스 계산
-        minimum_left_truncated_index = min(sample_start, shred_len)
-        maximum_right_truncated_index = min(
-            original_len - len(example['answers']['text'][0]), shred_len
-        )
-
-        # 왼쪽 및 오른쪽에서 자를 인덱스 랜덤 선택
-        truncated_left = random.randint(0, minimum_left_truncated_index)
-        truncated_right = random.randint(0, maximum_right_truncated_index)
-
-        # context를 잘라내고 answer_start 위치 조정
-        example['context'] = example['context'][truncated_left:original_len - truncated_right]
-        example['answers']['answer_start'][0] -= truncated_left
-
-        return example
-
-    train_dataset_ = train_dataset_.map(
-        preprocess_random_truncation,
-        with_indices=True,
-    )
-
-    return datasets.concatenate_datasets([train_dataset, train_dataset_]) if concat else datasets.concatenate_datasets([train_dataset_left, train_dataset_])
 
 def random_truncation_all(train_dataset : datasets.Dataset, ratio=0.75, concat=True):
     choice = np.random.choice(len(train_dataset), int(len(train_dataset) * ratio) if ratio <= 1 else ratio, replace=False)
@@ -385,132 +338,13 @@ def analysis():
             print(f"id : {str(list(output.keys())[0])}, output : {str(list(output.values())[0])} != answer : {str(list(answer.values())[0])}")
             print()
 
-# def sample_test(train_dataset : datasets.Dataset):
-#     train_dataset_ = copy.deepcopy(train_dataset)
-#     random_idx = int(np.random.choice(len(train_dataset), 1)[0])
-#     answer_start = train_dataset_[random_idx]['answers']['answer_start'][0]
-#
-#     example = train_dataset_[random_idx]
-#
-#     # insert "[HERE]" token to answer_start
-#     context = example['context'][0:answer_start] + "[HERE]" + example['context'][answer_start:]
-#     answer_start += len("[HERE]")
-#     print(context)
-#     print(context[answer_start:answer_start + len(example['answers']['text'][0])])
-#
-#
-#     # for k, v in sample.items():
-#     #     print(f"{k} : {v}")
-#     #     print()
-#     context_split_by_line = context.split('.')
-#
-#     if len(context_split_by_line) == 1:
-#         return example
-#
-#     # find a sentence number that contains the [HERE] token
-#     sentence_num = 0
-#     for i, sentence in enumerate(context_split_by_line):
-#         if answer_start < len(sentence):
-#             sentence_num = i
-#             break
-#
-#         else:
-#             answer_start -= len(sentence)
-#
-#     # swap this sentence with left or right sentence
-#     swap_direction = random.choice(['left', 'right'])
-#
-#     # only swap right if sentence index is 0
-#     if sentence_num == 0:
-#         swap_direction = 'right'
-#
-#     elif sentence_num == len(context_split_by_line) - 1:
-#         swap_direction = 'left'
-#
-#     else:
-#         swap_direction = random.choice(['left', 'right'])
-#
-#     if swap_direction == 'left':
-#         context_split_by_line[sentence_num], context_split_by_line[sentence_num - 1] = context_split_by_line[sentence_num - 1], context_split_by_line[sentence_num]
-#
-#     elif swap_direction == 'right':
-#         context_split_by_line[sentence_num], context_split_by_line[sentence_num + 1] = context_split_by_line[sentence_num + 1], context_split_by_line[sentence_num]
-#
-#     example['context'] = ''
-#     for elem in context_split_by_line:
-#         example['context'] += elem + '.'
-#
-#     # find index of [HERE] token
-#     answer_start = example['context'].find("[HERE]")
-#     example['context'] = example['context'].replace("[HERE]", "")
-#     example['answers']['answer_start'][0] = answer_start - len("[HERE]")
-#
-#     print(example['context'])
-#     print(example['context'][answer_start:answer_start + len(example['answers']['text'][0])])
-#
-#     return example
-def sample_test(train_dataset : datasets.Dataset):
-    train_dataset_ = copy.deepcopy(train_dataset)
-    random_idx = int(np.random.choice(len(train_dataset), 1)[0])
-
-    context = train_dataset_[random_idx]['context']
-    example = train_dataset_[random_idx]
-    answer_start = train_dataset_[random_idx]['answers']['answer_start'][0]
-
-    print(context)
-    print(context[answer_start:answer_start + len(example['answers']['text'][0])])
-
-    context = example['context'][0:answer_start] + "[HERE]" + example['context'][answer_start:]
-    answer_start_ = answer_start + len("[HERE]")
-
-
-    context_split = context.split('.')
-    sentence_num = 0
-
-    for i, sentence in enumerate(context_split):
-        if answer_start_ < len(sentence):
-            sentence_num = i
-            break
-
-        else:
-            answer_start_ -= len(sentence)
-
-    truncate = ['left', 'right']
-
-    if sentence_num == 0:
-        truncate_method = 'right'
-
-    elif sentence_num == len(context_split) - 1:
-        truncate_method = 'left'
-
-    else:
-        truncate_method = random.choice(truncate)
-
-    if truncate_method == 'left':
-        context_split = context_split[sentence_num-1:]
-
-    elif truncate_method == 'right':
-        context_split = context_split[:sentence_num+1]
-
-    example['context'] = ''
-    for elem in context_split:
-        example['context'] += elem + '.'
-
-    example['answers']['answer_start'][0] = example['context'].find("[HERE]")
-    example['context'] = example['context'].replace("[HERE]", "")
-
-    answer_start = example['answers']['answer_start'][0]
-    print(example['context'])
-    print(example['context'][answer_start:answer_start + len(example['answers']['text'][0])])
-
-    return example
-
 if __name__ == "__main__":
     train_dataset_dir = "../data/train_dataset/train/dataset.arrow"
     train_dataset = datasets.Dataset.from_file(train_dataset_dir)
 
-    #train_dataset = augmentation(train_dataset, tokenizer={})
+    train_dataset = augmentation(train_dataset, tokenizer={})
+
     #analysis()
     #swap_sentence(train_dataset, tokenizer={}, ratio=1)
     #random_truncation_all(train_dataset)
-    stop_word(train_dataset, tokenizer={}, ratio=1)
+    #stop_word(train_dataset, tokenizer={}, ratio=1)

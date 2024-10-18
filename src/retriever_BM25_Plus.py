@@ -14,7 +14,6 @@ from rank_bm25 import BM25Plus
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 
-
 @contextmanager
 def timer(name):
     t0 = time.time()
