@@ -149,15 +149,11 @@ def run_sparse_retrieval(
     datasets: DatasetDict,
     training_args: TrainingArguments,
     data_args: DataTrainingArguments,
-    data_path: str = "../data",
-    context_path: str = "wikipedia_documents.json",
 ) -> DatasetDict:
 
     retriever = BM25SparseRetrieval(
         tokenize_fn=tokenize_fn,
         args=data_args,  # args를 전달
-        data_path=data_path,
-        context_path=context_path
     )
     retriever.get_sparse_embedding()
 

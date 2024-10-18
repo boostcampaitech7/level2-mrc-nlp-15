@@ -52,7 +52,7 @@ class DataTrainingArguments:
     """
 
     dataset_name: Optional[str] = field(
-        default="../data/train_dataset",
+        default="data/train_dataset",
         metadata={"help": "The name of the dataset to use."},
     )
     overwrite_cache: bool = field(
@@ -119,7 +119,7 @@ class DataTrainingArguments:
         default=True, metadata={"help": "Whether to remove special character before embedding"}
     )
     data_path: str = field(
-        default="../data/",
+        default="data/",
         metadata={"help": "The path of the data directory"},
     )
     context_path: str = field(
