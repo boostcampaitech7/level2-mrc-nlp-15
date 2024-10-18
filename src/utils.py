@@ -26,6 +26,8 @@ def set_seed(seed: int = 42):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
+set_seed(42)
+
 
 def postprocess_qa_predictions(
     examples,
