@@ -9,7 +9,7 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        default="klue/roberta-large",
+        default="CurtisJeon/klue-roberta-large-korquad_v1_qa",
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
@@ -33,7 +33,7 @@ class ModelArguments:
         },
     )
     tokenizer_name: Optional[str] = field(
-        default="klue/roberta-large",
+        default=None,
         metadata={
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
@@ -51,7 +51,7 @@ class ModelArguments:
         },
     )
     retriever_name: Optional[str] = field(
-        default="tfidf",
+        default="bm25",
         metadata={
             "help": "Name of the retriever to use"
         },

@@ -77,20 +77,22 @@ def main(timestamp=None):
     base_directory = os.path.join(os.sep, 'data', 'ephemeral', 'home', 'level2-mrc-nlp-15')
     os.chdir(os.path.join(base_directory, 'src'))
 
-    if not timestamp:
-        print("Training a new model.")
+    model_dir = None  # model_dir 변수를 초기화합니다.
 
-        # Training and Evaluation
-        run_command([
-            'python', 'main.py',
-            '--output_dir', os.path.join(base_directory, 'models'),
-            '--do_train'
-        ])
-        model_dir = find_model_dir()  # Find the latest model directory
-        if not model_dir:
-            # Could not find model directory with the provided timestamp
-            print("Error: Could not find a suitable model directory.")
-            return
+    if not timestamp:
+            print("Training a new model.")
+
+            # Training and Evaluation
+            run_command([
+                'python', 'main.py',
+                '--output_dir', os.path.join(base_directory, 'models'),
+                '--do_train'
+            ])
+            model_dir = find_model_dir()  # Find the latest model directory
+            if not model_dir:
+                # Could not find model directory with the provided timestamp
+                print("Error: Could not find a suitable model directory.")
+                return
     else:
         model_dir = find_model_dir(timestamp)
 
