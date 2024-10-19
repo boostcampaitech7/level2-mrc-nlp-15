@@ -13,6 +13,9 @@ from rank_bm25 import BM25Plus
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 
+from utils import set_seed
+
+set_seed(42)
 
 @contextmanager
 def timer(name):
@@ -22,7 +25,8 @@ def timer(name):
 
 
 class BM25SparseRetrieval:
-    def __init__(self, tokenize_fn, args, data_path: Optional[str] = "data/", context_path: Optional[str] = "wikipedia_documents.json") -> None:
+    def __init__(self, tokenize_fn, args, data_path: Optional[str] = "../data/", context_path: Optional[str] = "wikipedia_documents.json") -> None:
+        set_seed(42)
         self.tokenizer = tokenize_fn
         self.data_path = data_path
         self.args = args 

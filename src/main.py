@@ -31,6 +31,7 @@ import wandb
 from CNN_layer_model import CNN_RobertaForQuestionAnswering
 
 logger = logging.getLogger(__name__)
+set_seed(42)
 wandb.init(project="odqa",
            name="run_" + (datetime.datetime.now() + datetime.timedelta(hours=9)).strftime("%Y%m%d_%H%M%S"))
 
