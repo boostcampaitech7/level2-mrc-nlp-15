@@ -342,6 +342,10 @@ def run_mrc(
         compute_metrics=lambda x: metric.compute(predictions=x.predictions, references=x.label_ids),
     )
 
+    dt_loader = trainer.get_train_dataloader()
+    dt_loader.shuffle = True
+    trainer.train_dataloader = dt_loader
+
     if training_args.do_train:
         if last_checkpoint is not None:
             checkpoint = last_checkpoint

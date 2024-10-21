@@ -77,6 +77,8 @@ if __name__ == '__main__':
     print(augmented_dataset)
 
     dataset['train'] = augmented_dataset
+    dataset['train'] = dataset['train'].shuffle()
+    dataset['validation'] = dataset['validation'].shuffle()
 
     # save the augmented dataset
     dataset.save_to_disk(parent_dir + '/data/AED_dataset')
