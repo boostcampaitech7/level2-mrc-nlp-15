@@ -7,10 +7,11 @@ class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
+    # monologg/koelectra-small-v2-distilled-korquad-384
     # CurtisJeon/klue-roberta-large-korquad_v1_qa
     # uomnf97/klue-roberta-finetuned-korquad-v2
     model_name_or_path: str = field(
-        default="CurtisJeon/klue-roberta-large-korquad_v1_qa",
+        default="uomnf97/klue-roberta-finetuned-korquad-v2",
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
@@ -43,6 +44,15 @@ class ModelArguments:
     )
 
     #################################################################################
+    b_is_circle: bool = field(
+        default=False
+    )
+    circle_dir: str = field(
+        default="data/circle_dataset"
+    )
+    korquad: bool = field(
+        default=False,
+    )
 
 
 @dataclass
@@ -64,7 +74,7 @@ class DataTrainingArguments:
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
     max_seq_length: int = field(
-        default=512,
+        default=384,
         metadata={
             "help": "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
@@ -99,7 +109,7 @@ class DataTrainingArguments:
         default=64, metadata={"help": "Define how many clusters to use for faiss."}
     )
     top_k_retrieval: int = field(
-        default=20,
+        default=40,
         metadata={
             "help": "Define how many top-k passages to retrieve based on similarity."
         },

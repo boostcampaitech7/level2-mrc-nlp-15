@@ -38,8 +38,6 @@ class CNN_RobertaForQuestionAnswering(RobertaPreTrainedModel):
         self.cnn_block3 = CNN_block(config.hidden_size, config.hidden_size)
         self.cnn_block4 = CNN_block(config.hidden_size, config.hidden_size)
         self.cnn_block5 = CNN_block(config.hidden_size, config.hidden_size)
-        self.cnn_block6 = CNN_block(config.hidden_size, config.hidden_size)
-        self.cnn_block7 = CNN_block(config.hidden_size, config.hidden_size)
 
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
     
@@ -82,8 +80,6 @@ class CNN_RobertaForQuestionAnswering(RobertaPreTrainedModel):
         sequence_output = self.cnn_block3(sequence_output)
         sequence_output = self.cnn_block4(sequence_output)
         sequence_output = self.cnn_block5(sequence_output)
-        sequence_output = self.cnn_block6(sequence_output)
-        sequence_output = self.cnn_block7(sequence_output)
 
         logits = self.qa_outputs(sequence_output)
         start_logits, end_logits = logits.split(1, dim=-1)

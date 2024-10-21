@@ -1,6 +1,8 @@
+import copy
 import datetime
 import logging
 import os
+import random
 import sys
 import numpy as np
 from typing import Callable, List, NoReturn, Tuple
@@ -25,15 +27,41 @@ from transformers import (
     EvalPrediction,
     HfArgumentParser,
     TrainingArguments,
+    AutoModelForQuestionAnswering
 )
 from utils import set_seed, check_no_error, postprocess_qa_predictions
 import wandb
 from CNN_layer_model import CNN_RobertaForQuestionAnswering
 
 logger = logging.getLogger(__name__)
-set_seed(42)
-wandb.init(project="odqa",
-           name="run_" + (datetime.datetime.now() + datetime.timedelta(hours=9)).strftime("%Y%m%d_%H%M%S"))
+# wandb.init(project="odqa",
+#            name="run_" + (datetime.datetime.now() + datetime.timedelta(hours=9)).strftime("%Y%m%d_%H%M%S"))
+
+def debug():
+    sys.argv = sys.argv[:1]
+    sys.argv.append("--output_dir")
+    sys.argv.append("models/circle_test")
+    sys.argv.append("--do_train")
+    sys.argv.append("--max_seq_length")
+    sys.argv.append("384")
+    sys.argv.append("--per_device_train_batch_size")
+    sys.argv.append("16")
+    sys.argv.append("--num_train_epochs")
+    sys.argv.append("3")
+    sys.argv.append("--learning_rate")
+    sys.argv.append("1e-5")
+    sys.argv.append("--b_is_circle")
+    sys.argv.append("True")
+    sys.argv.append("--overwrite_output_dir")
+
+    # sys.argv = sys.argv[:1]
+    # sys.argv.append("--output_dir")
+    # sys.argv.append("output/circle_test")
+    # sys.argv.append("--dataset_name")
+    # sys.argv.append("data/test_dataset")
+    # sys.argv.append("--model_name_or_path")
+    # sys.argv.append("models/train_circulum_CNN")
+    # sys.argv.append("--do_predict")
 
 def main():
     parser = HfArgumentParser(
@@ -53,10 +81,15 @@ def main():
 
     logger.info("Training/evaluation parameters %s", training_args)
 
-    set_seed(training_args.seed)
+    # check circle dataset directory is empty
+    os.makedirs(model_args.circle_dir, exist_ok=True)
+    if len(os.listdir(os.path.join(os.getcwd(), model_args.circle_dir))) > 0:
+        dataset_dir = model_args.circle_dir
 
-    datasets = load_from_disk(data_args.dataset_name)
-    print(datasets)
+    else:
+        dataset_dir = data_args.dataset_name
+
+    datasets = load_from_disk(dataset_dir)
 
     config = AutoConfig.from_pretrained(
         model_args.config_name
@@ -74,13 +107,18 @@ def main():
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
     )
+    # model = AutoModelForQuestionAnswering.from_pretrained(
+    #     model_args.model_name_or_path,
+    #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
+    #     config=config,
+    # )
 
     if training_args.do_predict and data_args.eval_retrieval:
         datasets = run_sparse_retrieval(
             tokenizer.tokenize, datasets, training_args, data_args,
         )
 
-    run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
+    run_mrc(data_args, training_args, model_args, datasets, config, tokenizer, model)
 
 
 def prepare_train_features(examples, tokenizer, question_column_name, pad_on_right, context_column_name, max_seq_length, data_args, answer_column_name):
@@ -156,6 +194,7 @@ def run_sparse_retrieval(
     retriever = BM25SparseRetrieval(
         tokenize_fn=tokenize_fn,
         args=data_args,  # args를 전달
+        data_path=os.path.join(os.getcwd(), 'data'),
     )
     retriever.get_sparse_embedding()
 
@@ -192,6 +231,7 @@ def run_sparse_retrieval(
                 "question": Value(dtype="string", id=None),
             }
         )
+
     datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
     return datasets
 
@@ -232,9 +272,11 @@ def run_mrc(
     training_args: TrainingArguments,
     model_args: ModelArguments,
     datasets: DatasetDict,
+    config,
     tokenizer,
     model,
 ) -> NoReturn:
+
     if training_args.do_train:
         column_names = datasets["train"].column_names
     else:
@@ -318,10 +360,16 @@ def run_mrc(
             return formatted_predictions
 
         elif training_args.do_eval:
-            references = [
-                {"id": ex["id"], "answers": ex[answer_column_name]}
-                for ex in datasets["validation"]
-            ]
+            if model_args.b_is_circle is False:
+                references = [
+                    {"id": ex["id"], "answers": ex[answer_column_name]}
+                    for ex in datasets["validation"]
+                ]
+            else:
+                references = [
+                    {"id": ex["id"], "answers": ex[answer_column_name]}
+                    for ex in examples
+                ]
             return EvalPrediction(
                 predictions=formatted_predictions, label_ids=references
             )
@@ -338,13 +386,142 @@ def run_mrc(
         compute_metrics=lambda x: metric.compute(predictions=x.predictions, references=x.label_ids),
     )
 
-    if training_args.do_train:
+    if training_args.do_train and model_args.b_is_circle:
+        n_split = 10
+        n_size = len(datasets['train']) // n_split
+        #
+        # make random indices with shuffle
+        indices = np.arange(len(datasets['train']))
+        np.random.shuffle(indices)
+
+        original_dataset_splits = []
+        train_dataset_splits = []
+        validation_dataset_splits = []
+        idx = 0
+
+        for i in range(n_split):
+            datasets_ = datasets['train'].select(indices[idx:idx + n_size])
+
+            datasets_t = datasets_.map(
+                prepare_train_features,
+                fn_kwargs={
+                    'tokenizer': tokenizer,
+                    'pad_on_right': pad_on_right,
+                    'max_seq_length': max_seq_length,
+                    'data_args': data_args,
+                    'question_column_name': question_column_name,
+                    'context_column_name': context_column_name,
+                    'answer_column_name': answer_column_name
+                },
+                batched=True,
+                num_proc=data_args.preprocessing_num_workers,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+            )
+
+            datasets_v = datasets_.map(
+                prepare_validation_features,
+                fn_kwargs={
+                    'tokenizer': tokenizer,
+                    'pad_on_right': pad_on_right,
+                    'max_seq_length': max_seq_length,
+                    'data_args': data_args,
+                    'question_column_name': question_column_name,
+                    'context_column_name': context_column_name,
+                    'answer_column_name': answer_column_name
+                },
+                batched=True,
+                num_proc=data_args.preprocessing_num_workers,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+            )
+
+            original_dataset_splits.append(datasets_)
+            train_dataset_splits.append(datasets_t)
+            validation_dataset_splits.append(datasets_v)
+            idx += n_size
+        #
+        time = datetime.datetime.now().strftime("%m%d_%H%M%S")
+        training_args_ = copy.deepcopy(training_args)
+
+        for i in range(n_split):
+            training_args_.output_dir = training_args.output_dir + f"/split_{time}_{i + 1}"
+            trainer.train_dataset = train_dataset_splits[i]
+            trainer.args = training_args_
+
+            print(f"*** Train split {i} ***")
+            train_result = trainer.train()
+            trainer.save_model()
+
+            model = AutoModelForQuestionAnswering.from_pretrained(
+                model_args.model_name_or_path,
+                from_tf=bool(".ckpt" in model_args.model_name_or_path),
+                config=config,
+            )
+            trainer.model = model
+
+        # curriculum training
+        # each dataset split is counted as F1 score of other model that has not been trained by its split
+        # EX) split_0's F1 score is evaluation of split_1 ~ split_9
+        eval_score = [[i, 0] for i in range(n_split)]
+        training_args_ = copy.deepcopy(training_args)
+        training_args_.do_train = False
+        training_args_.do_eval = True
+
+        for i in range(n_split):
+            for j in range(n_split):
+                if i == j:
+                    continue
+
+                model_name_or_path = training_args.output_dir + f"/split_{time}_{j + 1}"
+                model = AutoModelForQuestionAnswering.from_pretrained(
+                    model_name_or_path,
+                    from_tf=bool(".ckpt" in model_args.model_name_or_path),
+                    config=config,
+                )
+                trainer.model = model.to('cuda')
+                training_args_.output_dir = model_name_or_path
+
+                trainer = QATrainer(
+                    model=model,
+                    args=training_args_,
+                    train_dataset=None,
+                    eval_dataset=validation_dataset_splits[i],
+                    eval_examples=original_dataset_splits[i],
+                    tokenizer=tokenizer,
+                    data_collator=data_collator,
+                    post_process_function=post_processing_function,
+                    compute_metrics=lambda x: metric.compute(predictions=x.predictions, references=x.label_ids),
+                )
+
+                print(f"*** Evaluate split {i} - Model {j} ***")
+                metrics = trainer.evaluate()
+                eval_score[i][1] += metrics["f1"]
+
+            eval_score[i][1] /= n_split - 1
+
+        eval_score = sorted(eval_score, key=lambda x: -x[1])
+
+        # make new dataset -> this is concatenated dataset of all splits sorted by F1 score (high -> low)
+        datasets_ = original_dataset_splits[eval_score[0][0]]
+        for i in range(1, n_split):
+            from datasets import concatenate_datasets
+            datasets_ = concatenate_datasets([datasets_, original_dataset_splits[eval_score[i][0]]])
+
+        # save new dataset as arrow
+        datasets['train'] = datasets_
+        datasets.save_to_disk(os.path.join(model_args.circle_dir))
+
+        return
+
+    elif training_args.do_train:
         if last_checkpoint is not None:
             checkpoint = last_checkpoint
         elif os.path.isdir(model_args.model_name_or_path):
             checkpoint = model_args.model_name_or_path
         else:
             checkpoint = None
+
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         trainer.save_model()
 
@@ -367,6 +544,8 @@ def run_mrc(
             os.path.join(training_args.output_dir, "trainer_state.json")
         )
 
+        return
+
     logger.info("*** Evaluate ***")
 
     if training_args.do_predict:
@@ -386,4 +565,6 @@ def run_mrc(
 
 
 if __name__ == "__main__":
+    set_seed(42)
+    #debug()
     main()
