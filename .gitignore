@@ -1,12 +1,15 @@
 # python
 __pycache__
-
+.idea
 # dataset
 data
+code
+EDA
 
 # outputs
 models
 output
+src/test
 
 # wandb
 src/wandb
