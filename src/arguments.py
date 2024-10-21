@@ -10,7 +10,7 @@ class ModelArguments:
     # CurtisJeon/klue-roberta-large-korquad_v1_qa
     # uomnf97/klue-roberta-finetuned-korquad-v2
     model_name_or_path: str = field(
-        default="CurtisJeon/klue-roberta-large-korquad_v1_qa",
+        default="uomnf97/klue-roberta-finetuned-korquad-v2",
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
@@ -52,7 +52,7 @@ class DataTrainingArguments:
     """
 
     dataset_name: Optional[str] = field(
-        default="../data/train_dataset",
+        default="data/AED_dataset",
         metadata={"help": "The name of the dataset to use."},
     )
     overwrite_cache: bool = field(
