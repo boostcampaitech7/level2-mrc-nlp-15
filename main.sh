@@ -7,7 +7,7 @@ current_time=$(date -u -d "+9 hours" "+%Y%m%d_%H%M%S")
 model_name_or_path="uomnf97/klue-roberta-finetuned-korquad-v2"
 #model_name_or_path="monologg/koelectra-small-v2-distilled-korquad-384"
 
-circle_dataset_dir="data/circle_dataset"
+circle_dataset_dir="data/curriculum_dataset"
 
 eval_dir="output/eval_${current_time}"
 predict_dir="output/test_${current_time}"

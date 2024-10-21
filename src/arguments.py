@@ -48,7 +48,7 @@ class ModelArguments:
         default=False
     )
     circle_dir: str = field(
-        default="data/circle_dataset"
+        default="data/curriculum_dataset"
     )
     korquad: bool = field(
         default=False,
