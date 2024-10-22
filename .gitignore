@@ -1,6 +1,8 @@
 # python
 __pycache__
 .idea
+*.pem
+
 # dataset
 data
 code
