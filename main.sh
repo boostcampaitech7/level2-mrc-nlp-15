@@ -5,6 +5,7 @@ current_time=$(date -u -d "+9 hours" "+%Y%m%d_%H%M%S")
 #model_name_or_path="yjgwak/klue-bert-base-finetuned-squad-kor-v1"
 #model_name_or_path="CurtisJeon/klue-roberta-large-korquad_v1_qa"
 model_name_or_path="uomnf97/klue-roberta-finetuned-korquad-v2"
+#model_name_or_path="ahotrod/electra_large_discriminator_squad2_512"
 #model_name_or_path="monologg/koelectra-small-v2-distilled-korquad-384"
 
 train_dir="models/train_${current_time}"
@@ -14,7 +15,7 @@ predict_dir="output/test_${current_time}"
 predict_dataset_name="data/test_dataset"
 
 ##cd /data/ephemeral/home/level2-mrc-nlp-15/src
-python src/main.py --output_dir $train_dir --do_train --max_seq_length 384 --per_device_train_batch_size 16 --num_train_epochs 3 --learning_rate "1e-5"
+python src/main.py --output_dir $train_dir  --model_name_or_path $model_name_or_path  --do_train --max_seq_length 384 --per_device_train_batch_size 16 --num_train_epochs 3 --learning_rate "1e-5"
 
 # Perform evaluation (optional)
 python src/main.py --output_dir $train_dir --do_eval --model_name_or_path $train_dir

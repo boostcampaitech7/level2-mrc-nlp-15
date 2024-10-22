@@ -19,7 +19,7 @@ from qa_trainer import QATrainer
 from retrieval_BM25 import BM25SparseRetrieval
 from transformers import (
     AutoConfig,
-    #AutoModelForQuestionAnswering,
+    AutoModelForQuestionAnswering,
     AutoTokenizer,
     DataCollatorWithPadding,
     EvalPrediction,
@@ -71,9 +71,14 @@ def main():
     )
     model = CNN_RobertaForQuestionAnswering.from_pretrained(
         model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
     )
+    # model = AutoModelForQuestionAnswering.from_pretrained(
+    #     model_args.model_name_or_path,
+    #     config=config,
+    # )
+
+    print(model)
 
     if training_args.do_predict and data_args.eval_retrieval:
         datasets = run_sparse_retrieval(
@@ -342,10 +347,6 @@ def run_mrc(
         compute_metrics=lambda x: metric.compute(predictions=x.predictions, references=x.label_ids),
     )
 
-    dt_loader = trainer.get_train_dataloader()
-    dt_loader.shuffle = True
-    trainer.train_dataloader = dt_loader
-
     if training_args.do_train:
         if last_checkpoint is not None:
             checkpoint = last_checkpoint
@@ -353,7 +354,7 @@ def run_mrc(
             checkpoint = model_args.model_name_or_path
         else:
             checkpoint = None
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        train_result = trainer.train()
         trainer.save_model()
 
         metrics = train_result.metrics
