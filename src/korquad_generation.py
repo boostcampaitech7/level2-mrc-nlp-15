@@ -316,9 +316,37 @@ if __name__ == '__main__':
 
     print(f"Length of dataset train: {len(kq_1['train'])}")
     print(f"Length of dataset validation: {len(kq_1['validation'])}")
-
     kq_1 = kq_1.shuffle(42)
-    kq_1.save_to_disk(os.path.join(parent_dir, "data", "train_dataset_and_korquad_20000"))
+
+    # divide kq_1 in three parts
+    kq_1_1_t = kq_1['train'].select(indices=[i for i in range(len(kq_1['train'])) if i % 3 == 0])
+    kq_1_2_t = kq_1['train'].select(indices=[i for i in range(len(kq_1['train'])) if i % 3 == 1])
+    kq_1_3_t = kq_1['train'].select(indices=[i for i in range(len(kq_1['train'])) if i % 3 == 2])
+
+    kq_1_1_v = kq_1['validation'].select(indices=[i for i in range(len(kq_1['validation'])) if i % 3 == 0])
+    kq_1_2_v = kq_1['validation'].select(indices=[i for i in range(len(kq_1['validation'])) if i % 3 == 1])
+    kq_1_3_v = kq_1['validation'].select(indices=[i for i in range(len(kq_1['validation'])) if i % 3 == 2])
+
+    s1 = datasets.DatasetDict({
+        'train': kq_1_1_t,
+        'validation': kq_1_1_v
+    })
+
+    s2 = datasets.DatasetDict({
+        'train': kq_1_2_t,
+        'validation': kq_1_2_v
+    })
+
+    s3 = datasets.DatasetDict({
+        'train': kq_1_3_t,
+        'validation': kq_1_3_v
+    })
+
+    s1.save_to_disk(os.path.join(parent_dir, "data", "train_dataset_and_korquad_20000_1"))
+    s2.save_to_disk(os.path.join(parent_dir, "data", "train_dataset_and_korquad_20000_2"))
+    s3.save_to_disk(os.path.join(parent_dir, "data", "train_dataset_and_korquad_20000_3"))
+
+
 
     # concat kq_1 and kq_3
     # kq_1['train'] = datasets.concatenate_datasets([kq_1['train'], kq_3['train']])
