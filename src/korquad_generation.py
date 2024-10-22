@@ -311,8 +311,14 @@ if __name__ == '__main__':
     kq_1['train'] = datasets.concatenate_datasets([kq_1['train'], kq_4['train']])
     kq_1['validation'] = datasets.concatenate_datasets([kq_1['validation'], kq_4['validation']])
 
+    kq_1['train'] = kq_1['train'].filter(lambda x: len(x['answers']['text']) <= 64)
+    kq_1['validation'] = kq_1['validation'].filter(lambda x: len(x['answers']['text']) <= 64)
+
+    print(f"Length of dataset train: {len(kq_1['train'])}")
+    print(f"Length of dataset validation: {len(kq_1['validation'])}")
+
     kq_1 = kq_1.shuffle(42)
-    kq_1.save_to_disk(os.path.join(parent_dir, "data", "train_dataset_and_korquad_10000"))
+    kq_1.save_to_disk(os.path.join(parent_dir, "data", "train_dataset_and_korquad_20000"))
 
     # concat kq_1 and kq_3
     # kq_1['train'] = datasets.concatenate_datasets([kq_1['train'], kq_3['train']])
