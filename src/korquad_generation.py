@@ -3,6 +3,7 @@ import re
 import datasets
 from bs4 import BeautifulSoup
 import MeCab
+import numpy as np
 
 replace_list = [
     '이 문서는 미공개 또는 계획만 발표되었거나, 현재 진행 중인 작품의 내용을 포함하고 있습니다. 내용에 대한 의견이 있으시다면  토론 문서에서 나누어 주세요.정확한 내용을 반영할 수 있도록 문서 수정을 도와주세요.',
@@ -143,6 +144,33 @@ def validation_(dataset):
 
     return dataset
 
+def run_4():
+    kq_4 = datasets.load_dataset("squad_kor_v1")
+
+    kq_4_train_choice = np.random.choice(len(kq_4['train']), int(len(kq_4['train']) * 0.33))
+    kq_4['train'] = kq_4['train'].select(kq_4_train_choice)
+
+    return kq_4
+
+def renew_dataset(dataset):
+    import pandas as pd
+    # Function to filter unique titles
+    def filter_unique_titles(dataset):
+        df = pd.DataFrame(dataset)
+        return df.to_dict('records')
+
+    # Apply the filter to both train and validation splits
+    train_filtered = filter_unique_titles(dataset['train'])
+    validation_filtered = filter_unique_titles(dataset['validation'])
+
+    # Create a new dataset with filtered data
+    filtered_dataset = datasets.DatasetDict({
+        'train': datasets.Dataset.from_pandas(pd.DataFrame(train_filtered)),
+        'validation': datasets.Dataset.from_pandas(pd.DataFrame(validation_filtered))
+    })
+
+    return filtered_dataset
+
 def run_3():
     parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
     kq_3 = datasets.load_from_disk(os.path.join(parent_dir, "data", "train_dataset"))
@@ -247,6 +275,7 @@ def run_1():
 
 if __name__ == '__main__':
     name = 'korquad_1_full'
+    parent_dir = os.path.dirname(os.getcwd())
     # kq_2 = run_2()
     # kq_2.save_to_disk(os.path.join(os.getcwd(), name))
     # kq_2 = datasets.load_from_disk(os.path.join(os.getcwd(), name))
@@ -260,21 +289,33 @@ if __name__ == '__main__':
     # kq_2.save_to_disk(os.path.join(os.getcwd(), "korquad_2_full_1"))
     # kq_2['train'].to_csv(os.path.join(os.getcwd(), "korquad_2_full_1.json"), encoding='utf-16')
 
-    kq_1 = run_1()
-    kq_1 = validation_(kq_1)
-    kq_1.save_to_disk(os.path.join(os.getcwd(), "train_korquad1_Mecab"))
-
-    # kq_2 = run_2()
-    # kq_2 = validation_(kq_2)
-    # kq_2.save_to_disk(os.path.join(os.getcwd(), "train_dataset_Mecab"))
+    # kq_1 = run_1()
+    # kq_1 = validation_(kq_1)
+    # kq_1.save_to_disk(os.path.join(os.getcwd(), "train_korquad1_Mecab"))
     #
+    # # kq_2 = run_2()
+    # # kq_2 = validation_(kq_2)
+    # # kq_2.save_to_disk(os.path.join(os.getcwd(), "train_dataset_Mecab"))
+    # #
+    #
+    # kq_3 = run_3()
+    # kq_3 = validation_(kq_3)
+    # kq_3.save_to_disk(os.path.join(os.getcwd(), "train_dataset_Mecab"))
 
-    kq_3 = run_3()
-    kq_3 = validation_(kq_3)
-    kq_3.save_to_disk(os.path.join(os.getcwd(), "train_dataset_Mecab"))
+    kq_4 = run_4()
+    kq_4 = validation_(kq_4)
+    kq_4 = renew_dataset(kq_4)
+
+    kq_1 = datasets.load_from_disk(os.path.join(parent_dir, "data", "train_dataset"))
+
+    kq_1['train'] = datasets.concatenate_datasets([kq_1['train'], kq_4['train']])
+    kq_1['validation'] = datasets.concatenate_datasets([kq_1['validation'], kq_4['validation']])
+
+    kq_1 = kq_1.shuffle(42)
+    kq_1.save_to_disk(os.path.join(parent_dir, "data", "train_dataset_and_korquad_10000"))
 
     # concat kq_1 and kq_3
-    kq_1['train'] = datasets.concatenate_datasets([kq_1['train'], kq_3['train']])
-    kq_1['validation'] = datasets.concatenate_datasets([kq_1['validation'], kq_3['validation']])
-    kq_1 = kq_1.shuffle(42)
-    kq_1.save_to_disk(os.path.join(os.getcwd(), "train_dataset_and_korquad_Mecab"))
+    # kq_1['train'] = datasets.concatenate_datasets([kq_1['train'], kq_3['train']])
+    # kq_1['validation'] = datasets.concatenate_datasets([kq_1['validation'], kq_3['validation']])
+    # kq_1 = kq_1.shuffle(42)
+    # kq_1.save_to_disk(os.path.join(os.getcwd(), "train_dataset_and_korquad_Mecab"))
