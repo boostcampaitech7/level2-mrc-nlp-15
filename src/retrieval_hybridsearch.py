@@ -60,7 +60,7 @@ class HybridSearch:
         # self.sparse_embeder = TfidfVectorizer(
         #     tokenizer=self.tokenize_fn, ngram_range=(1, 2), max_features=50000,
         # )
-        self.spares_embeder = None
+        self.sparse_embeder = None
         self.dense_embeder = AutoModel.from_pretrained(
             self.dense_model_name
         )
@@ -180,13 +180,14 @@ class HybridSearch:
         # c_vec = torch.tensor(c_vec)
         # return q_vec.matmul(c_vec.T)
    
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         if isinstance(q_vec, scipy.sparse.spmatrix):
             q_vec = q_vec.toarray()  
         if isinstance(c_vec, scipy.sparse.spmatrix):
             c_vec = c_vec.toarray()
         
-        q_vec = torch.tensor(q_vec, dtype=torch.float32)
-        c_vec = torch.tensor(c_vec, dtype=torch.float32)
+        q_vec = torch.tensor(q_vec, dtype=torch.float32).to(deivce)
+        c_vec = torch.tensor(c_vec, dtype=torch.float32).to(device)
 
         if q_vec.ndim == 1:
             q_vec = q_vec.unsqueeze(0) 
@@ -195,12 +196,13 @@ class HybridSearch:
 
         similarity_score = torch.matmul(q_vec, c_vec.T)
         
-        return similarity_score  
+        return similarity_score.cpu()  
 
     def get_cosine_score(self, q_vec, c_vec):
-        q_vec = q_vec / q_vec.norm(dim=1, keepdim=True)
-        c_vec = c_vec / c_vec.norm(dim=1, keepdim=True)
-        return torch.mm(q_vec, c_vec.T)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        q_vec = q_vec / q_vec.norm(dim=1, keepdim=True).to(device)
+        c_vec = c_vec / c_vec.norm(dim=1, keepdim=True).to(device)
+        return torch.mm(q_vec, c_vec.T).cpu()
 
     def retrieve(self, query_or_dataset, topk: Optional[int] = 1, alpha: Optional[float] = 0.7):
         # assert self.sparse_embeds is not None, "You should first execute `get_sparse_embedding()`"
@@ -224,17 +226,19 @@ class HybridSearch:
                     query_or_dataset["question"], alpha, k=topk
                 )
             for idx, example in enumerate(tqdm(query_or_dataset, desc="[Hybrid retrieval] ")):
-                tmp = {
-                    "question": example["question"],
-                    "id": example["id"],
-                    "context": " ".join([self.contexts[pid] for pid in doc_indices[idx]]),
-                }
-                if "context" in example.keys() and "answers" in example.keys():
-                    tmp["original_context"] = example["context"]
-                    tmp["answers"] = example["answers"]
-                total.append(tmp)
+            #     tmp = {
+            #         "question": example["question"],
+            #         "id": example["id"],
+            #         "context": " ".join([self.contexts[pid] for pid in doc_indices[idx]]),
+            #     }
+            #     if "context" in example.keys() and "answers" in example.keys():
+            #         tmp["original_context"] = example["context"]
+            #         tmp["answers"] = example["answers"]
+            #     total.append(tmp)
+                    total.append([self.contexts[pid] for pid in doc_indices[idx]])
 
-            cqas = pd.DataFrame(total)
+            # cqas = pd.DataFrame(total)
+            cqas=total
             return cqas
 
     def get_relevant_doc(self, query: str, alpha: float, k: Optional[int] = 1) -> Tuple[List, List]:
@@ -251,8 +255,12 @@ class HybridSearch:
             dense_score = self.get_similarity_score(dense_qvec, self.dense_embeds)
             result = self.hybrid_scale(dense_score.numpy(), sparse_score, alpha)
         sorted_result = np.argsort(result.squeeze())[::-1]
-        doc_score = result.squeeze()[sorted_result].tolist()[:k]
-        doc_indices = sorted_result.tolist()[:k]
+        if result.squeeze().ndim == 0:
+            doc_score = result.reshape(-1)[sorted_result].tolist()[:k] 
+            doc_indices = sorted_result.tolist()[:k]
+        else:
+            doc_score = result.squeeze()[sorted_result].tolist()[:k]
+            doc_indices = sorted_result.tolist()[:k]
         return doc_score, doc_indices
 
     def get_relevant_doc_bulk(

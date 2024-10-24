@@ -45,11 +45,12 @@ class DenseRetrieval:
         logging.info(f"Lengths of contexts : {len(self.contexts)}")
         self.ids = list(range(len(self.contexts)))
 
+        self.dense_model_name = 'upskyy/bge-m3-korean'
         self.tokenize_fn = AutoTokenizer.from_pretrained(
-            'sentence-transformers/paraphrase-multilingual-mpnet-base-v2'
+            self.dense_model_name #'intfloat/multilingual-e5-large-instruct'#'sentence-transformers/paraphrase-multilingual-mpnet-base-v2'
         )
         self.dense_embeder = AutoModel.from_pretrained(
-            'sentence-transformers/paraphrase-multilingual-mpnet-base-v2'
+            self.dense_model_name #'intfloat/multilingual-e5-large-instruct'#'sentence-transformers/paraphrase-multilingual-mpnet-base-v2'
         )
         self.dense_embeds = None
 
@@ -64,10 +65,13 @@ class DenseRetrieval:
             with torch.no_grad():
                 model_output = self.dense_embeder(**encoded_input)
             sentence_embeddings = mean_pooling(model_output, encoded_input['attention_mask'])
-            self.dense_embeds = sentence_embeddings.cpu()
+            # self.dense_embeds = sentence_embeddings.cpu()
+            self.dense_embeds = sentence_embeddings
 
         if question is None and contexts is None:
-            pickle_name = "dense_without_normalize_embedding.bin"
+            # pickle_name = "dense_without_normalize_embedding.bin"
+            model_n = self.dense_model_name.split('/')[1]
+            pickle_name = f"{model_n}_dense_embedding.bin"
             emd_path = os.path.join(self.data_path, pickle_name)
 
             if os.path.isfile(emd_path):
@@ -104,7 +108,8 @@ class DenseRetrieval:
             with torch.no_grad():
                 model_output = self.dense_embeder(**encoded_input)
             sentence_embeddings = mean_pooling(model_output, encoded_input['attention_mask'])
-            return sentence_embeddings.cpu()
+            # return sentence_embeddings.cpu()
+            return sentence_embeddings
 
     def get_similarity_score(self, q_vec, c_vec):
         if isinstance(q_vec, scipy.sparse.spmatrix):
@@ -114,17 +119,17 @@ class DenseRetrieval:
 
         q_vec = torch.tensor(q_vec)
         c_vec = torch.tensor(c_vec)
-        return q_vec.matmul(c_vec.T).numpy()
+        return q_vec.matmul(c_vec.T).cpu().numpy()
 
     def get_cosine_score(self, q_vec, c_vec):
         q_vec = q_vec / q_vec.norm(dim=1, keepdim=True)
         c_vec = c_vec / c_vec.norm(dim=1, keepdim=True)
-        return torch.mm(q_vec, c_vec.T).numpy()
+        return torch.mm(q_vec, c_vec.T).cpu().numpy()
 
     def retrieve(
         self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
     ) -> Union[Tuple[List[float], List[str]], pd.DataFrame]:
-        assert self.dense_embeds is not None, "You should first execute `get_sparse_embedding()`"
+        assert self.dense_embeds is not None, "You should first execute `get_dense_embedding()`"
 
         if isinstance(query_or_dataset, str):
             doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk)
@@ -134,6 +139,7 @@ class DenseRetrieval:
                 logging.info(f"Top-{i+1} passage with score {doc_scores[i]:.6f}")
                 logging.info(self.contexts[doc_indices[i]])
 
+            # return (doc_scores, [self.contexts[doc_indices[i]] for i in range(topk)], doc_indices) # 임시로 doc_indices 반환 값으로 추가해둔 상태임 나중에 삭제할 것
             return (doc_scores, [self.contexts[doc_indices[i]] for i in range(topk)])
 
         elif isinstance(query_or_dataset, Dataset):
@@ -143,38 +149,45 @@ class DenseRetrieval:
                     query_or_dataset["question"], k=topk
                 )
             for idx, example in enumerate(tqdm(query_or_dataset, desc="[Sparse retrieval] ")):
-                retrieved_contexts = [self.contexts[pid] for pid in doc_indices[idx]]
-                tmp = {
-                    "question": example["question"],
-                    "id": example["id"],
-                    "context": " ".join(retrieved_contexts),
-                }
-                if "context" in example.keys() and "answers" in example.keys():
-                    tmp["original_context"] = example["context"]
-                    tmp["answers"] = example["answers"]
-                total.append(tmp)
-
-            cqas = pd.DataFrame(total)
+            #     retrieved_contexts = [self.contexts[pid] for pid in doc_indices[idx]]
+            #     tmp = {
+            #         "question": example["question"],
+            #         "id": example["id"],
+            #         "context": " ".join(retrieved_contexts),
+            #     }
+            #     if "context" in example.keys() and "answers" in example.keys():
+            #         tmp["original_context"] = example["context"]
+            #         tmp["answers"] = example["answers"]
+            #     total.append(tmp)
+                    total.append([self.contexts[pid] for pid in doc_indices[idx]])
+            # cqas = pd.DataFrame(total)
+            cqas = total
             return cqas
 
     def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
         with timer("transform"):
             dense_qvec = self.get_dense_embedding(question=[query])
 
         with timer("query ex search"):
-            result = self.get_cosine_score(dense_qvec, self.dense_embeds)
+            result = self.get_cosine_score(dense_qvec, self.dense_embeds.to(device))
             # result = self.get_similarity_score(dense_qvec, self.dense_embeds)
         sorted_result = np.argsort(result.squeeze())[::-1]
-        doc_score = result.squeeze()[sorted_result].tolist()[:k]
-        doc_indices = sorted_result.tolist()[:k]
+        if result.squeeze().ndim == 0:
+            doc_score = result.reshape(-1)[sorted_result].tolist()[:k] 
+            doc_indices = sorted_result.tolist()[:k]
+        else:
+            doc_score = result.squeeze()[sorted_result].tolist()[:k]
+            doc_indices = sorted_result.tolist()[:k]
         return doc_score, doc_indices
 
     def get_relevant_doc_bulk(
         self, queries: List[str], k: Optional[int] = 1
     ) -> Tuple[List, List]:
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
         dense_qvec = self.get_dense_embedding(question=queries)
         
-        result = self.get_cosine_score(dense_qvec, self.dense_embeds)
+        result = self.get_cosine_score(dense_qvec, self.dense_embeds.to(device))
         # result = self.get_similarity_score(dense_qvec, self.dense_embeds)
         doc_scores = []
         doc_indices = []
@@ -222,8 +235,8 @@ if __name__ == "__main__":
     with timer("single query by exhaustive search"):
         scores, contexts = retriever.retrieve(query, topk=5)
 
-    with timer("bulk query by exhaustive search"):
-        df = retriever.retrieve(full_ds, topk=1)
-        if "original_context" in df.columns:
-            df["correct"] = df["original_context"] == df["context"]
-            logging.info(f'correct retrieval result by exhaustive search: {df["correct"].sum() / len(df)}')
+    
+    for i, context in enumerate(contexts):
+        print(f"Top-{i} 의 문서입니다. ")
+        print("---------------------------------------------")
+        print(context)

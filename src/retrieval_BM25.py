@@ -39,7 +39,7 @@ class BM25SparseRetrieval:
         self.contexts = list(dict.fromkeys([v["text"] for v in wiki.values()]))
         print(f"Lengths of unique contexts : {len(self.contexts)}")
         
-        self.bm25 = None   
+        self.sparse_embeder = None   
 
 
     def get_sparse_embedding(self, contexts=None) -> None:
@@ -49,23 +49,23 @@ class BM25SparseRetrieval:
         if contexts is not None:
             self.contexts = contexts
             tokenized_corpus = [self.tokenizer(doc) for doc in self.contexts]
-            self.bm25 = BM25Plus(tokenized_corpus, k1=1.7595, b=0.9172, delta=1.1490)
+            self.sparse_embeder = BM25Plus(tokenized_corpus, k1=1.7595, b=0.9172, delta=1.1490)
         else:
             if os.path.isfile(emd_path):
                 with open(emd_path, "rb") as file:
-                    self.bm25 = pickle.load(file)
+                    self.sparse_embeder = pickle.load(file)
                 print("Embedding pickle load.")
             else:
                 print("Build passage embedding")
                 tokenized_corpus = [self.tokenizer(doc) for doc in self.contexts]
-                self.bm25 = BM25Plus(tokenized_corpus, k1=1.7595, b=0.9172, delta=1.1490)  # BM25Plus로 변경 후 하이퍼파라미터 Optuna test1 적용
+                self.sparse_embeder = BM25Plus(tokenized_corpus, k1=1.7595, b=0.9172, delta=1.1490)  # BM25Plus로 변경 후 하이퍼파라미터 Optuna test1 적용
                 with open(emd_path, "wb") as file:
-                    pickle.dump(self.bm25, file)
+                    pickle.dump(self.sparse_embeder, file)
                 print("Embedding pickle saved.")
 
 
     def retrieve(self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1) -> Union[Tuple[List, List], pd.DataFrame]:
-        assert self.bm25 is not None, "get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
+        assert self.sparse_embeder is not None, "get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
 
         if isinstance(query_or_dataset, str):
             doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk)
@@ -84,23 +84,24 @@ class BM25SparseRetrieval:
 
             total = []
             for idx, example in enumerate(tqdm(query_or_dataset, desc="Sparse retrieval: ")):
-                tmp = {
-                    "question": example["question"],
-                    "id": example["id"],
-                    "context": " ".join([self.contexts[pid] for pid in doc_indices[idx]]),
-                }
-                if "context" in example.keys() and "answers" in example.keys():
-                    tmp["original_context"] = example["context"]
-                    tmp["answers"] = example["answers"]
-                total.append(tmp)
-
-            return pd.DataFrame(total)
+                # tmp = {
+                #     "question": example["question"],
+                #     "id": example["id"],
+                #     "context": " ".join([self.contexts[pid] for pid in doc_indices[idx]]),
+                # }
+                # if "context" in example.keys() and "answers" in example.keys():
+                #     tmp["original_context"] = example["context"]
+                #     tmp["answers"] = example["answers"]
+                # total.append(tmp)
+                total.append([self.contexts[pid] for pid in doc_indices[idx]])
+            # total = pd.DataFrame(total)
+            return total
         
 
     def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
         """개별 질의에 대한 상위 k개의 Passage 검색"""
         tokenized_query = [self.tokenizer(query)]
-        result = np.array([self.bm25.get_scores(query) for query in tokenized_query])
+        result = np.array([self.sparse_embeder.get_scores(query) for query in tokenized_query])
         doc_scores = []
         doc_indices = []
         
@@ -115,7 +116,7 @@ class BM25SparseRetrieval:
     def get_relevant_doc_bulk(self, queries: List, k: Optional[int] = 1) -> Tuple[List, List]:
         """여러 개의 Query를 받아 상위 k개의 Passage 검색"""
         tokenized_queries = [self.tokenizer(query) for query in queries]
-        result = np.array([self.bm25.get_scores(query) for query in tokenized_queries])
+        result = np.array([self.sparse_embeder.get_scores(query) for query in tokenized_queries])
         doc_scores = []
         doc_indices = []
         

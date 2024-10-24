@@ -111,17 +111,19 @@ class TFIDFRetrieval:
                     query_or_dataset["question"], k=topk
                 )
             for idx, example in enumerate(tqdm(query_or_dataset, desc="[Sparse retrieval] ")):
-                tmp = {
-                    "question": example["question"],
-                    "id": example["id"],
-                    "context": " ".join([self.contexts[pid] for pid in doc_indices[idx]]),
-                }
-                if "context" in example.keys() and "answers" in example.keys():
-                    tmp["original_context"] = example["context"]
-                    tmp["answers"] = example["answers"]
-                total.append(tmp)
+                # tmp = {
+                #     "question": example["question"],
+                #     "id": example["id"],
+                #     "context": " ".join([self.contexts[pid] for pid in doc_indices[idx]]),
+                # }
+                # if "context" in example.keys() and "answers" in example.keys():
+                #     tmp["original_context"] = example["context"]
+                #     tmp["answers"] = example["answers"]
+                # total.append(tmp)
+                total.append([self.contexts[pid] for pid in doc_indices[idx]])
 
-            cqas = pd.DataFrame(total)
+            # cqas = pd.DataFrame(total)
+            cqas = total
             return cqas
 
     def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
@@ -135,8 +137,12 @@ class TFIDFRetrieval:
             result = result.toarray()
 
         sorted_result = np.argsort(result.squeeze())[::-1]
-        doc_score = result.squeeze()[sorted_result].tolist()[:k]
-        doc_indices = sorted_result.tolist()[:k]
+        if result.squeeze().ndim == 0:
+            doc_score = result.reshape(-1)[sorted_result].tolist()[:k] 
+            doc_indices = sorted_result.tolist()[:k]
+        else:
+            doc_score = result.squeeze()[sorted_result].tolist()[:k]
+            doc_indices = sorted_result.tolist()[:k]
         return doc_score, doc_indices
 
     def get_relevant_doc_bulk(

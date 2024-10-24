@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import numpy as np
+from typing import Optional
 from typing import Callable, List, NoReturn, Tuple
 
 from arguments import DataTrainingArguments, ModelArguments
@@ -20,6 +21,7 @@ from retrieval_BM25 import BM25SparseRetrieval
 from retrieval_hybridsearch import HybridSearch
 from retrieval_Dense import DenseRetrieval
 from retrieval_2s_rerank import TwoStageReranker
+from retrieval_tfidf import TFIDFRetrieval
 
 from transformers import (
     AutoConfig,
@@ -37,23 +39,21 @@ class Retriever:
     def __init__(
         self,
         tokenize_fn,
-        args,
         data_path: Optional[str] = "../data/",
         context_path: Optional[str] = "wikipedia_documents.json",
-        name: str
+        name: Optional[str] = None
      ):
+        self.name = name
         self.retriever = None
         if name == "2s_rerank":
             self.retriever = TwoStageReranker(
-                tokenize_fn=tokenize_fn,
-                args=data_args,  
+                tokenize_fn=tokenize_fn, 
                 data_path=data_path,
                 context_path=context_path
             )
         elif name == "BM25":
             self.retriever = BM25SparseRetrieval(
                 tokenize_fn=tokenize_fn,
-                # args=data_args,  
                 data_path=data_path,
                 context_path=context_path
             )
@@ -67,7 +67,6 @@ class Retriever:
         elif name == "hybridsearch":
             self.retriever = HybridSearch(
                 tokenize_fn=tokenize_fn,
-                # args=data_args,
                 data_path=data_path,
                 context_path=context_path
             )
@@ -76,11 +75,12 @@ class Retriever:
         elif name == "tfidf":
             self.retriever = TFIDFRetrieval(
                 tokenize_fn=tokenize_fn,
-                args=data_args, 
                 data_path=data_path,
                 context_path=context_path
             )
             self.retriever.get_sparse_embedding()
 
-    def retrieve(self, query_or_dataset):
-        return self.retriever.retrieve(query_or_dataset)
+    def retrieve(self, query_or_dataset, topk: Optional[int] = 1, alpha: Optional[float] = 0.7):
+        if isinstance(self.retriever, HybridSearch):
+            return self.retriever.retrieve(query_or_dataset, topk, alpha=0.0060115995634538455)
+        return self.retriever.retrieve(query_or_dataset, topk)

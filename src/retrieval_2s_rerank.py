@@ -37,7 +37,6 @@ class TwoStageReranker:
     def __init__(
         self,
         tokenize_fn,
-        # args,
         data_path: Optional[str] = "../data/",
         context_path: Optional[str] = "wikipedia_documents.json",
     ) -> NoReturn:
@@ -51,7 +50,6 @@ class TwoStageReranker:
 
         self.sparse_embeder = BM25SparseRetrieval(
             tokenize_fn=tokenize_fn,
-            # args=args,
             data_path=data_path,
             context_path=context_path
         )
@@ -86,7 +84,9 @@ class TwoStageReranker:
                 _, doc_indices = self.retrieve_first(example['question'], topk)
                 retrieved_contexts.append(doc_indices)
 
-        half_topk = int(topk / 3)
+        half_topk = 20 #int(topk / 3)
+        if half_topk <= 0:
+            half_topk = 1
 
         if isinstance(query_or_dataset, str):
             second_df = self.retireve_second(query_or_dataset, half_topk, contexts=retrieved_contexts)
@@ -96,13 +96,14 @@ class TwoStageReranker:
             for i, example in enumerate(query_or_dataset):
                 context = retrieved_contexts[i]
                 doc_scores, doc_indices = self.retireve_second(example['question'], half_topk, contexts=context)
-                tmp = {
-                    "question": example["question"],
-                    "id": example["id"],
-                    "context": " ".join(doc_indices),
-                }
-                second_df.append(tmp)
-            second_df = pd.DataFrame(second_df)
+                # tmp = {
+                #     "question": example["question"],
+                #     "id": example["id"],
+                #     "context": " ".join(doc_indices),
+                # }
+                # second_df.append(tmp) 
+                second_df.append(doc_indices)
+            # second_df = pd.DataFrame(second_df)
             return second_df
 
 if __name__ == "__main__":
@@ -137,10 +138,14 @@ if __name__ == "__main__":
 
     retriever = TwoStageReranker(
         tokenize_fn=tokenizer.tokenize,
-        args=args,
         data_path=args.data_path,
         context_path=args.context_path,
     )
 
     with timer("single query by exhaustive search"):
-        doc_scores, doc_indices = retriever.retrieve(query, topk=5)
+        doc_scores, doc_indices = retriever.retrieve(query, topk=1)
+        
+    for i, context in enumerate(doc_indices):
+        print(f"Top-{i} 의 문서입니다. ")
+        print("---------------------------------------------")
+        print(context)

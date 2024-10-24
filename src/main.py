@@ -160,14 +160,14 @@ def run_sparse_retrieval(
     context_path: str = "wikipedia_documents.json",
 ) -> DatasetDict:
 
-    retriever = HybridSearch(
-        tokenize_fn=tokenize_fn,
-        # args=data_args,  # args를 전달
-        data_path=data_path,
-        context_path=context_path
-    )
-    retriever.get_sparse_embedding()
-    retriever.get_dense_embedding()
+    # retriever = HybridSearch(
+    #     tokenize_fn=tokenize_fn,
+    #     # args=data_args,  # args를 전달
+    #     data_path=data_path,
+    #     context_path=context_path
+    # )
+    # retriever.get_sparse_embedding()
+    # retriever.get_dense_embedding()
 
     # retriever = BM25SparseRetrieval(
     #     tokenize_fn=tokenize_fn,
@@ -183,11 +183,11 @@ def run_sparse_retrieval(
     #     context_path=context_path
     # )
     
-    # retriever = DenseRetrieval(
-    #     data_path=data_path,
-    #     context_path=context_path
-    # )
-    # retriever.get_dense_embedding()
+    retriever = DenseRetrieval(
+        data_path=data_path,
+        context_path=context_path
+    )
+    retriever.get_dense_embedding()
 
     # if data_args.use_faiss:
     #     retriever.build_faiss(num_clusters=data_args.num_clusters)
@@ -196,9 +196,9 @@ def run_sparse_retrieval(
     #     )
     # else:     
 
-    # df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval)
+    df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval)
     # df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval, alpha=data_args.alpha_retrieval)
-    df = retriever.retrieve(datasets["validation"], topk=10, alpha=0.7)
+    # df = retriever.retrieve(datasets["validation"], topk=10, alpha=0.7)
 
 
     if training_args.do_predict:
