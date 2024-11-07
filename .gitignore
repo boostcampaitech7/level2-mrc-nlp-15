@@ -1,0 +1,19 @@
+# python
+__pycache__
+.idea
+
+# dataset
+data
+code
+EDA
+
+# outputs
+models
+output
+
+# src
+src/test
+src/wandb
+
+# wandb
+wandb
